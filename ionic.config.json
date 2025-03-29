@@ -1,0 +1,8 @@
+{
+  "name": "AthletiqUI",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular",
+  "id": "93d1dc92"
+}
