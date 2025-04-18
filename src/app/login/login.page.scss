@@ -1,0 +1,45 @@
+.error {
+    color: red;
+    font-size: 0.8em;
+    margin-top: 4px;
+  }
+
+.forgetpass {
+  text-decoration: underline;
+  color: rgb(67, 191, 233);
+  text-align: center; /* Center the text */
+  cursor: pointer;
+  font-size: 0.9rem; /* Slightly smaller font size for the link */
+  display: block; /* Ensure it takes up the full width of the container */
+}
+
+ion-item {
+  margin-bottom: 24px; /* Increase spacing between input fields */
+  --background: transparent;
+  
+  ion-label {
+    margin-bottom: 8px; /* Add space between the label and the input box */
+    font-size: 1rem; /* Slightly larger font size for better readability */
+    color: var(--ion-color-medium); /* Use a neutral color for the label */
+  }
+
+ 
+}
+
+ion-title {
+  text-align: center; /* Center the title */
+}
+
+ion-button {
+  margin-top: 16px;
+  font-size: 1rem; /* Make the button text more prominent */
+}
+
+.forgetpass {
+  text-decoration: underline;
+  color: rgb(67, 191, 233);
+  text-align: right;
+  cursor: pointer;
+  font-size: 0.9rem; /* Slightly smaller font size for the link */
+}
+
