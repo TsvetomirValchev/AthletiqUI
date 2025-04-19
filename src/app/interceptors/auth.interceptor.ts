@@ -19,7 +19,9 @@ export class AuthInterceptor implements HttpInterceptor {
     
     const publicEndpoints = [
       '/auth/register',
-      '/auth/login'
+      '/auth/login',
+      '/auth/forgot-password',
+      '/auth/reset-password'    
     ];
     
     const isPublicEndpoint = publicEndpoints.some(endpoint => 
@@ -30,7 +32,6 @@ export class AuthInterceptor implements HttpInterceptor {
     console.log('Token exists:', !!token, 'Is public endpoint:', isPublicEndpoint);
     
     if (token && !isPublicEndpoint) {
-      // Clone the request with the token
       const authReq = request.clone({
         setHeaders: {
           'Authorization': `Bearer ${token}`

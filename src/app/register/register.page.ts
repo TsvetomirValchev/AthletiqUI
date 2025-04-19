@@ -2,6 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { RegisterResponse } from '../models/registerResponse';
+
 
 @Component({
   selector: 'app-register',
@@ -38,15 +41,15 @@ export class RegisterPage implements OnInit {
       const { username, email, password } = this.registerForm.value;
       console.log('Attempting to register user:', { username, email });
       
-      this.authService.register({ username, email, password }).subscribe(
-        (response) => {
+      this.authService.register({ username, email, password }).subscribe({
+        next: (response: RegisterResponse) => {
           console.log('Registration successful:', response);
           this.router.navigate(['/login']);
         },
-        (error) => {
+        error: (error: HttpErrorResponse) => {
           console.error('Registration failed:', error);
         }
-      );
+      });
     } else {
       console.log('Form validation errors:', this.registerForm.errors);
       
