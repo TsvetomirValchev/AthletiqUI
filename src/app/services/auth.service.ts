@@ -156,12 +156,12 @@ export class AuthService {
       );
   }
 
-  login(username: string, password: string): Observable<any> {
+  login(usernameOrEmail: string, password: string): Observable<any> {
     const headers = {
       'X-Client-Type': this.storage.isMobile() ? 'mobile' : 'web'
     };
     return this.http.post(`${this.apiUrl}/login`, { 
-      usernameOrEmail: username,
+      usernameOrEmail: usernameOrEmail,
       password 
     }, { headers, responseType: "text" })
     .pipe(
@@ -173,7 +173,7 @@ export class AuthService {
         this.saveTokenBasedOnPlatform(token);
         
         // Update user data
-        const userData = { username };
+        const userData = { username: usernameOrEmail };
         this.saveUserData(userData);
         this.currentUserSubject.next(userData);
       })
@@ -213,15 +213,23 @@ export class AuthService {
     return null;
   }
 
-  logout(): void {
+  logout(): Observable<any> {
     // Clear memory
     this.accessToken = null;
     this.currentUserSubject.next(null);
     
     // Clear storage
-    this.storage.removeItem('mobileAuthToken');
-    this.storage.removeItem('webAuthToken');
-    this.storage.removeItem('userData');
+    return from(Promise.all([
+      this.storage.removeItem('mobileAuthToken'),
+      this.storage.removeItem('webAuthToken'),
+      this.storage.removeItem('userData')
+    ])).pipe(
+      map(() => null),
+      catchError(error => {
+        console.error('Error during logout:', error);
+        return of(null);
+      })
+    );
   }
 
   requestPasswordReset(email: string): Observable<any> {
@@ -240,5 +248,9 @@ export class AuthService {
         throw error;
       })
     );
+  }
+
+  isLoggedInSync(): boolean {
+    return this.accessToken !== null;
   }
 }

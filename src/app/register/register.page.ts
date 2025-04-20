@@ -3,7 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { RegisterResponse } from '../models/registerResponse';
+import { RegisterResponse } from '../models/register-response.model';
 
 
 @Component({

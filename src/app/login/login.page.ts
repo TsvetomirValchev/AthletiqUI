@@ -39,7 +39,7 @@ export class LoginPage implements OnInit {
           const token = response;
           this.authService.saveToken(token);
           console.log('Login successful:', token);
-          this.router.navigate(['/tabs/tab1']);
+          this.router.navigate(['/tabs/profile']);
         },
         error: async (error) => {
           this.isLoading = false;

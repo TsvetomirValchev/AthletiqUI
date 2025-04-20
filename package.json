@@ -29,6 +29,7 @@
     "@capacitor/status-bar": "7.0.0",
     "@ionic/angular": "^8.5.2",
     "@ionic/angular-server": "^8.5.2",
+    "chart.js": "^4.4.9",
     "ionicons": "^7.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
