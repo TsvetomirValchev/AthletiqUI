@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 import { Observable, of, BehaviorSubject, from } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { StorageService } from './storage.service';
@@ -9,7 +10,7 @@ import { Platform } from '@ionic/angular';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:6969/auth';
+  private apiUrl = `${environment.apiUrl}/auth`;
   private currentUserSubject = new BehaviorSubject<any>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
   

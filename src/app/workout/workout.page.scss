@@ -1,0 +1,24 @@
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+ion-accordion {
+  margin-bottom: 8px;
+}
+
+.exercise-item {
+  --padding-start: 24px;
+}
+
+.exercise-name {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+ion-note {
+  font-size: 14px;
+  margin-right: 8px;
+}

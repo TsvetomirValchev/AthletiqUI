@@ -1,0 +1,56 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Create Routine</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="routineForm" (ngSubmit)="saveRoutine()">
+    <ion-item>
+      <ion-label position="stacked">Routine Name</ion-label>
+      <ion-input formControlName="name" placeholder="Enter a name for your routine"></ion-input>
+      <ion-note slot="error" *ngIf="routineForm.get('name')?.invalid && routineForm.get('name')?.touched">
+        Name is required and must be at least 3 characters
+      </ion-note>
+    </ion-item>
+
+    <div class="ion-padding-top">
+      <ion-button expand="block" (click)="addExercise()" type="button">
+        <ion-icon name="add-outline" slot="start"></ion-icon>
+        Add Exercise
+      </ion-button>
+    </div>
+
+    <ion-list *ngIf="exerciseIdsArray.length > 0">
+      <ion-list-header>
+        <ion-label>Exercises</ion-label>
+      </ion-list-header>
+
+      <ion-reorder-group>
+        <ion-item *ngFor="let exerciseControl of exerciseIdsArray.controls; let i = index">
+          <ion-label>{{ getTemplateName(exerciseControl.value) }}</ion-label>
+          <ion-reorder slot="end"></ion-reorder>
+          <ion-button slot="end" fill="clear" color="danger" (click)="removeExercise(i)">
+            <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+          </ion-button>
+        </ion-item>
+      </ion-reorder-group>
+    </ion-list>
+
+    <div *ngIf="exerciseIdsArray.length === 0" class="ion-padding ion-text-center">
+      <p color="medium">No exercises added yet. Click "Add Exercise" to start building your routine.</p>
+    </div>
+
+    <div class="ion-padding-top">
+      <ion-button expand="block" type="submit" [disabled]="routineForm.invalid || isLoading">
+        <ion-icon name="save-outline" slot="start"></ion-icon>
+        Save Routine
+      </ion-button>
+    </div>
+  </form>
+
+  <ion-loading [isOpen]="isLoading" message="Saving routine..."></ion-loading>
+</ion-content>

@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { WorkoutService } from '../services/workout.service';
 import { Workout } from '../models/workout.model';
-import { IonicModule } from '@ionic/angular';
+import { IonicModule, AlertController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
+import { ExerciseTemplate } from '../models/exercise-template.model';
 
 @Component({
   selector: 'app-workout',
@@ -15,13 +16,16 @@ import { RouterLink } from '@angular/router';
 export class WorkoutPage implements OnInit {
   workouts: Workout[] = [];
   isLoading = false;
-
+  exerciseTemplates: Map<string, ExerciseTemplate> = new Map();
   constructor(
-    private workoutService: WorkoutService
+    private workoutService: WorkoutService,
+    private router: Router,
+    private alertController: AlertController
   ) { }
 
   ngOnInit() {
     this.loadWorkouts();
+    this.loadExerciseTemplates();
   }
 
   loadWorkouts() {
@@ -38,15 +42,48 @@ export class WorkoutPage implements OnInit {
     });
   }
 
-  async startEmptyWorkout() {
+  loadExerciseTemplates() {
+    this.workoutService.getExerciseTemplates().subscribe({
+      next: (templates) => {
+        templates.forEach(template => {
+          if (template.exerciseTemplateId) {
+            this.exerciseTemplates.set(template.exerciseTemplateId, template);
+          }
+        });
+      },
+      error: (error) => {
+        console.error('Error loading exercise templates:', error);
+      }
+    });
+  }
+
+  getExerciseName(exerciseId: string): string {
+    const template = this.exerciseTemplates.get(exerciseId);
+    return template ? template.name : 'Unknown Exercise';
+  }
+
+  getExerciseCount(workout: Workout): number {
+    return workout.exerciseIds?.length || 0;
+  }
+
+  startEmptyWorkout() {
     const newWorkout: Workout = {
       name: `Workout ${new Date().toLocaleDateString()}`,
-      exerciseIds: [] // Changed from exercises to exerciseIds to match your model
+      exerciseIds: []
     };
 
     this.workoutService.createWorkout(newWorkout).subscribe({
       next: (createdWorkout) => {
-        this.workoutService.startWorkout(createdWorkout).subscribe();
+        this.workoutService.startWorkout(createdWorkout).subscribe({
+          next: (activeWorkout) => {
+            this.router.navigate(['/active-workout'], { 
+              queryParams: { workoutId: activeWorkout.workoutId }
+            });
+          },
+          error: (error) => {
+            console.error('Error starting workout:', error);
+          }
+        });
       },
       error: (error) => {
         console.error('Error creating workout:', error);
@@ -54,8 +91,49 @@ export class WorkoutPage implements OnInit {
     });
   }
 
-  openWorkout(workout: Workout) {
-    this.workoutService.startWorkout(workout).subscribe();
+  startWorkout(workout: Workout) {
+    if (!workout.workoutId) return;
+
+    this.workoutService.startWorkout(workout).subscribe({
+      next: (activeWorkout) => {
+        this.router.navigate(['/active-workout'], { 
+          queryParams: { workoutId: activeWorkout.workoutId }
+        });
+      },
+      error: (error) => {
+        console.error('Error starting workout:', error);
+      }
+    });
+  }
+
+  async deleteWorkout(workout: Workout) {
+    const alert = await this.alertController.create({
+      header: 'Delete Routine',
+      message: 'Are you sure you want to delete this routine?',
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        }, {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            if (workout.workoutId) {
+              this.workoutService.deleteWorkout(workout.workoutId).subscribe({
+                next: () => {
+                  this.workouts = this.workouts.filter(w => w.workoutId !== workout.workoutId);
+                },
+                error: (error) => {
+                  console.error('Error deleting workout:', error);
+                }
+              });
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 
   ionViewWillEnter() {
