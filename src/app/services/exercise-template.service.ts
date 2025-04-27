@@ -29,6 +29,9 @@ export class ExerciseTemplateService {
   }
 
   getTemplateById(id: string): Observable<ExerciseTemplate> {
+    if (!id) {
+      return throwError(() => new Error('Template ID is required'));
+    }
     return this.http.get<ExerciseTemplate>(`${this.apiUrl}/${id}`)
       .pipe(
         tap(template => console.log(`Fetched template: ${template.name}`)),
@@ -37,14 +40,14 @@ export class ExerciseTemplateService {
   }
 
   getTemplateByName(name: string): Observable<ExerciseTemplate> {
-    return this.http.get<ExerciseTemplate>(`${this.apiUrl}/by-name/${encodeURIComponent(name)}`)
+    return this.http.get<ExerciseTemplate>(`${this.apiUrl}/by-name`, { params: { name } })
       .pipe(
         catchError(error => throwError(() => new Error('Template not found')))
       );
   }
 
   getTemplatesByMuscleGroup(muscleGroup: string): Observable<ExerciseTemplate[]> {
-    return this.http.get<ExerciseTemplate[]>(`${this.apiUrl}/by-muscle-group/${encodeURIComponent(muscleGroup)}`)
+    return this.http.get<ExerciseTemplate[]>(`${this.apiUrl}/by-muscle-group`, { params: { muscleGroup } })
       .pipe(
         catchError(error => throwError(() => new Error('Failed to load templates')))
       );

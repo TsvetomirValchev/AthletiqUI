@@ -1,47 +1,34 @@
 <ion-header>
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
-    </ion-buttons>
     <ion-title>Browse Exercises</ion-title>
-  </ion-toolbar>
-  <ion-toolbar>
-    <ion-searchbar placeholder="Search exercises" (ionInput)="onSearch($event)"></ion-searchbar>
-  </ion-toolbar>
-  <ion-toolbar>
-    <ion-segment [(ngModel)]="selectedCategory" (ionChange)="onCategoryChange()">
-      <ion-segment-button value="all">
-        <ion-label>All</ion-label>
-      </ion-segment-button>
-      <ion-segment-button *ngFor="let category of categories" [value]="category">
-        <ion-label>{{ category }}</ion-label>
-      </ion-segment-button>
-    </ion-segment>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-list>
-    <ion-item *ngFor="let exercise of filteredTemplates" (click)="viewExerciseDetails(exercise)" button>
-      <ion-thumbnail slot="start" *ngIf="exercise.imageUrl">
-        <img [src]="exercise.imageUrl" alt="{{ exercise.name }}">
-      </ion-thumbnail>
-      <ion-icon slot="start" *ngIf="!exercise.imageUrl" name="barbell-outline"></ion-icon>
-      <ion-label>
-        <h2>{{ exercise.name }}</h2>
-        <p>{{ exercise.targetMuscleGroups?.join(', ') || 'No target muscles specified' }}</p>
-      </ion-label>
-      <ion-note slot="end" color="primary" *ngIf="exercise.category">{{ exercise.category }}</ion-note>
-    </ion-item>
-  </ion-list>
+  <ion-searchbar [(ngModel)]="searchTerm" (ionChange)="onSearch($event)" placeholder="Search exercises"></ion-searchbar>
 
   <div *ngIf="isLoading" class="ion-padding ion-text-center">
-    <ion-spinner name="crescent"></ion-spinner>
+    <ion-spinner></ion-spinner>
     <p>Loading exercises...</p>
   </div>
 
-  <div *ngIf="filteredTemplates.length === 0 && !isLoading" class="ion-padding ion-text-center">
-    <ion-icon name="search-outline" size="large" color="medium"></ion-icon>
-    <p>No exercises found. Try adjusting your search criteria.</p>
-  </div>
+  <ion-list *ngIf="!isLoading">
+    <ion-item *ngFor="let exercise of filteredTemplates" button detail (click)="viewExerciseDetails(exercise)">
+      <ion-label>
+        <h2>{{ exercise.name }}</h2>
+        <p *ngIf="exercise.description">{{ exercise.description }}</p>
+        <p *ngIf="exercise.targetMuscleGroups?.length">
+          <span *ngFor="let muscle of exercise.targetMuscleGroups; let last = last">
+            {{ muscle }}{{ !last ? ', ' : '' }}
+          </span>
+        </p>
+      </ion-label>
+    </ion-item>
+    
+    <ion-item *ngIf="filteredTemplates.length === 0">
+      <ion-label class="ion-text-center">
+        No exercises found
+      </ion-label> 
+    </ion-item>
+  </ion-list>
 </ion-content>

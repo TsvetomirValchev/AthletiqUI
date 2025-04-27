@@ -17,8 +17,6 @@ export class BrowseExercisesPage implements OnInit {
   exerciseTemplates: ExerciseTemplate[] = [];
   filteredTemplates: ExerciseTemplate[] = [];
   isLoading = false;
-  categories: string[] = [];
-  selectedCategory: string = 'all';
   searchTerm: string = '';
 
   constructor(
@@ -37,15 +35,6 @@ export class BrowseExercisesPage implements OnInit {
       next: (templates: ExerciseTemplate[]) => {
         this.exerciseTemplates = templates;
         this.filteredTemplates = [...templates];
-        
-                const uniqueCategories = new Set<string>();
-        templates.forEach(template => {
-          if (template.category) {
-            uniqueCategories.add(template.category);
-          }
-        });
-        this.categories = Array.from(uniqueCategories);
-        
         this.isLoading = false;
       },
       error: (error: Error) => {
@@ -57,18 +46,9 @@ export class BrowseExercisesPage implements OnInit {
 
   filterExercises() {
     this.filteredTemplates = this.exerciseTemplates.filter(template => {
-      const matchesCategory = this.selectedCategory === 'all' || 
-                             template.category === this.selectedCategory;
-      
-      const matchesSearch = !this.searchTerm || 
-                           template.name.toLowerCase().includes(this.searchTerm.toLowerCase());
-      
-      return matchesCategory && matchesSearch;
+      return !this.searchTerm || 
+             template.name.toLowerCase().includes(this.searchTerm.toLowerCase());
     });
-  }
-
-  onCategoryChange() {
-    this.filterExercises();
   }
 
   onSearch(event: any) {

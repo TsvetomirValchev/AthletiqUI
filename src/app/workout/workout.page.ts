@@ -4,7 +4,10 @@ import { Workout } from '../models/workout.model';
 import { IonicModule, AlertController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
+import { Exercise } from '../models/exercise.model';
 import { ExerciseTemplate } from '../models/exercise-template.model';
+import { catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 @Component({
   selector: 'app-workout',
@@ -15,8 +18,9 @@ import { ExerciseTemplate } from '../models/exercise-template.model';
 })
 export class WorkoutPage implements OnInit {
   workouts: Workout[] = [];
+  workoutExercises: Map<string, Exercise[]> = new Map();
   isLoading = false;
-  exerciseTemplates: Map<string, ExerciseTemplate> = new Map();
+
   constructor(
     private workoutService: WorkoutService,
     private router: Router,
@@ -25,45 +29,54 @@ export class WorkoutPage implements OnInit {
 
   ngOnInit() {
     this.loadWorkouts();
-    this.loadExerciseTemplates();
   }
 
   loadWorkouts() {
     this.isLoading = true;
     this.workoutService.getUserWorkouts().subscribe({
-      next: (workouts) => {
+      next: (workouts: Workout[]) => {
         this.workouts = workouts;
-        this.isLoading = false;
+        // Load exercises for each workout
+        this.loadAllExercises();
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('Error loading workouts:', error);
         this.isLoading = false;
       }
     });
   }
 
-  loadExerciseTemplates() {
-    this.workoutService.getExerciseTemplates().subscribe({
-      next: (templates) => {
-        templates.forEach(template => {
-          if (template.exerciseTemplateId) {
-            this.exerciseTemplates.set(template.exerciseTemplateId, template);
-          }
-        });
-      },
-      error: (error) => {
-        console.error('Error loading exercise templates:', error);
-      }
-    });
+  loadAllExercises() {
+    if (this.workouts.length === 0) {
+      this.isLoading = false;
+      return;
+    }
+    
+    this.workouts
+      .filter(workout => workout.workoutId)
+      .forEach(workout => {
+        if (!workout.workoutId) return;
+        
+        this.workoutService.getExercisesForWorkout(workout.workoutId)
+          .pipe(
+            catchError(err => {
+              console.error(`Error fetching exercises for workout ${workout.workoutId}:`, err);
+              return of([]);
+            })
+          )
+          .subscribe({
+            next: (exercises) => {
+              this.workoutExercises.set(workout.workoutId!, exercises);
+            },
+            complete: () => {
+              this.isLoading = false;
+            }
+          });
+      });
   }
 
-  getExerciseName(exerciseId: string): string {
-    const template = this.exerciseTemplates.get(exerciseId);
-    return template ? template.name : 'Unknown Exercise';
-  }
-
-  getExerciseCount(workout: Workout): number {
-    return workout.exerciseIds?.length || 0;
+  getWorkoutExercises(workoutId: string): Exercise[] {
+    return this.workoutExercises.get(workoutId) || [];
   }
 
   startEmptyWorkout() {
@@ -73,19 +86,19 @@ export class WorkoutPage implements OnInit {
     };
 
     this.workoutService.createWorkout(newWorkout).subscribe({
-      next: (createdWorkout) => {
+      next: (createdWorkout: Workout) => {
         this.workoutService.startWorkout(createdWorkout).subscribe({
-          next: (activeWorkout) => {
+          next: (activeWorkout: any) => {
             this.router.navigate(['/active-workout'], { 
               queryParams: { workoutId: activeWorkout.workoutId }
             });
           },
-          error: (error) => {
+          error: (error: Error) => {
             console.error('Error starting workout:', error);
           }
         });
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('Error creating workout:', error);
       }
     });
@@ -95,12 +108,12 @@ export class WorkoutPage implements OnInit {
     if (!workout.workoutId) return;
 
     this.workoutService.startWorkout(workout).subscribe({
-      next: (activeWorkout) => {
+      next: (activeWorkout: any) => {
         this.router.navigate(['/active-workout'], { 
           queryParams: { workoutId: activeWorkout.workoutId }
         });
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('Error starting workout:', error);
       }
     });
@@ -123,7 +136,7 @@ export class WorkoutPage implements OnInit {
                 next: () => {
                   this.workouts = this.workouts.filter(w => w.workoutId !== workout.workoutId);
                 },
-                error: (error) => {
+                error: (error: Error) => {
                   console.error('Error deleting workout:', error);
                 }
               });

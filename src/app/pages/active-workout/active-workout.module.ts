@@ -1,11 +1,8 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-
 import { IonicModule } from '@ionic/angular';
-
 import { ActiveWorkoutPageRoutingModule } from './active-workout-routing.module';
-
 import { ActiveWorkoutPage } from './active-workout.page';
 
 @NgModule({
@@ -13,8 +10,9 @@ import { ActiveWorkoutPage } from './active-workout.page';
     CommonModule,
     FormsModule,
     IonicModule,
-    ActiveWorkoutPageRoutingModule
+    ActiveWorkoutPageRoutingModule,
+    ActiveWorkoutPage
   ],
-  declarations: [ActiveWorkoutPage]
+  providers: []
 })
 export class ActiveWorkoutPageModule {}

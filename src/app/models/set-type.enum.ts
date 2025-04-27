@@ -1,6 +1,6 @@
 export enum SetType {
     NORMAL = 'NORMAL',
     WARMUP = 'WARMUP',
-    DROP = 'DROP',
+    DROPSET = 'DROPSET',
     FAILURE = 'FAILURE'
 }

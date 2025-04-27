@@ -5,6 +5,7 @@ import { Observable, of, BehaviorSubject, from } from 'rxjs';
 import { map, catchError, tap, switchMap } from 'rxjs/operators';
 import { StorageService } from './storage.service';
 import { Platform } from '@ionic/angular';
+import { DecodedToken } from '../models/token.model';
 
 @Injectable({
   providedIn: 'root'
@@ -14,7 +15,6 @@ export class AuthService {
   private currentUserSubject = new BehaviorSubject<any>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
   
-  // For in-memory token storage
   private accessToken: string | null = null;
 
   constructor(
@@ -22,12 +22,10 @@ export class AuthService {
     private storage: StorageService,
     private platform: Platform
   ) {
-    // Check authentication on startup
     this.checkAuthentication();
   }
 
   private async checkAuthentication(): Promise<void> {
-    // Different auth strategies for mobile vs web
     if (this.storage.isMobile()) {
       await this.checkMobileAuth();
     } else {
@@ -36,22 +34,18 @@ export class AuthService {
   }
 
   private async checkMobileAuth(): Promise<void> {
-    // For mobile: try to use stored token directly
     const token = await this.storage.getItem('mobileAuthToken');
     const userDataStr = await this.storage.getItem('userData');
     
     if (token) {
-      // Set token for immediate use
       this.accessToken = token;
       
       try {
-        // Parse and set user data if available
         if (userDataStr) {
           const userData = JSON.parse(userDataStr);
           this.currentUserSubject.next(userData);
         }
         
-        // Silently validate/refresh in background
         this.validateToken().subscribe();
       } catch (e) {
         console.error('Error parsing stored data', e);
@@ -60,11 +54,9 @@ export class AuthService {
   }
 
   private async checkWebAuth(): Promise<void> {
-    // For web: more standard approach with validation
     const token = await this.storage.getItem('webAuthToken');
     if (token) {
       try {
-        // Validate token before setting it
         const payload = token.split('.')[1];
         const decodedPayload = JSON.parse(atob(payload));
         const expired = decodedPayload.exp * 1000 < Date.now();
@@ -84,12 +76,10 @@ export class AuthService {
   }
 
   checkTokenStatus(): Observable<{ exists: boolean, valid: boolean }> {
-    // Memory-first check for token
     if (this.accessToken) {
       return of({ exists: true, valid: true });
     }
     
-    // Fall back to storage
     const storageKey = this.storage.isMobile() ? 'mobileAuthToken' : 'webAuthToken';
     return from(this.storage.getItem(storageKey)).pipe(
       map(token => {
@@ -102,8 +92,6 @@ export class AuthService {
           const decodedPayload = JSON.parse(atob(payload));
           const expired = decodedPayload.exp * 1000 < Date.now();
           
-          // On mobile, consider expired tokens still "valid" for UI purposes
-          // We'll refresh them in the background
           if (this.storage.isMobile() && expired) {
             return { exists: true, valid: true };
           }
@@ -117,12 +105,10 @@ export class AuthService {
   }
 
   isAuthenticated(): Observable<boolean> {
-    // Check memory first
     if (this.accessToken) {
       return of(true);
     }
     
-    // Fall back to storage
     const storageKey = this.storage.isMobile() ? 'mobileAuthToken' : 'webAuthToken';
     return from(this.storage.getItem(storageKey)).pipe(
       map(token => !!token)
@@ -130,7 +116,6 @@ export class AuthService {
   }
 
   validateToken(): Observable<boolean> {
-    // Try to validate token with server
     const headers = {
       'Authorization': `Bearer ${this.accessToken}`,
       'X-Client-Type': this.storage.isMobile() ? 'mobile' : 'web'
@@ -148,13 +133,23 @@ export class AuthService {
           return true;
         }),
         catchError(error => {
-          // Only logout on web - mobile keeps trying with existing token
           if (!this.storage.isMobile()) {
             this.logout();
           }
           return of(false);
         })
       );
+  }
+
+  private decodeToken(token: string): DecodedToken | null {
+    try {
+      const payload = token.split('.')[1];
+      const decodedPayload = JSON.parse(atob(payload));
+      return decodedPayload;
+    } catch (e) {
+      console.error('Error decoding token', e);
+      return null;
+    }
   }
 
   login(usernameOrEmail: string, password: string): Observable<any> {
@@ -167,14 +162,17 @@ export class AuthService {
     }, { headers, responseType: "text" })
     .pipe(
       tap(token => {
-        // Store in memory
         this.accessToken = token;
         
-        // Store in appropriate persistence
+        const decodedToken = this.decodeToken(token);
+        const userId = decodedToken?.userId || decodedToken?.sub;
+        
         this.saveTokenBasedOnPlatform(token);
         
-        // Update user data
-        const userData = { username: usernameOrEmail };
+        const userData = { 
+          username: usernameOrEmail,
+          userId: userId
+        };
         this.saveUserData(userData);
         this.currentUserSubject.next(userData);
       })
@@ -215,11 +213,9 @@ export class AuthService {
   }
 
   logout(): Observable<any> {
-    // Clear memory
     this.accessToken = null;
     this.currentUserSubject.next(null);
     
-    // Clear storage
     return from(Promise.all([
       this.storage.removeItem('mobileAuthToken'),
       this.storage.removeItem('webAuthToken'),
@@ -254,4 +250,18 @@ export class AuthService {
   isLoggedInSync(): boolean {
     return this.accessToken !== null;
   }
+
+  // Add this to your auth.service.ts to check token validity
+isTokenExpired(): boolean {
+  const token = this.getToken();
+  if (!token) return true;
+  
+  const decodedToken = this.decodeToken(token);
+  if (!decodedToken?.exp) return true;
+  
+  const expirationDate = new Date(0);
+  expirationDate.setUTCSeconds(decodedToken.exp);
+  
+  return expirationDate.valueOf() <= new Date().valueOf();
+}
 }

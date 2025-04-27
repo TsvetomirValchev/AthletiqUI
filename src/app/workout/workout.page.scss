@@ -1,24 +1,18 @@
-.quick-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+.workout-card {
+  margin: 16px;
+  border-radius: 10px;
+
+  ion-card-title {
+    font-size: 18px;
+  }
+
+  ion-list {
+    margin-bottom: 16px;
+  }
 }
 
-ion-accordion {
-  margin-bottom: 8px;
-}
-
-.exercise-item {
-  --padding-start: 24px;
-}
-
-.exercise-name {
-  font-size: 14px;
-  opacity: 0.8;
-}
-
-ion-note {
-  font-size: 14px;
-  margin-right: 8px;
+.workout-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
