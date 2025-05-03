@@ -49,18 +49,21 @@
             </ion-buttons>
           </ion-item-divider>
           
-          <!-- Exercise Sets -->
-          <ion-item *ngFor="let setId of exercise.exerciseSetIds; let i = index">
-            <ion-label>
-              <h3>Set {{i+1}}</h3>
-              <!-- You can add set details here if available -->
-            </ion-label>
-            <ion-button slot="end" fill="clear" *ngIf="workoutActive" (click)="toggleSetComplete(exercise, setId)">
-              <ion-icon name="checkmark-circle-outline"></ion-icon>
-            </ion-button>
-          </ion-item>
+          <!-- Exercise Sets - Updated to work with embedded sets -->
+          <div *ngIf="exercise.sets && exercise.sets.length > 0">
+            <app-exercise-set 
+              *ngFor="let set of exercise.sets; let i = index"
+              [displayLabel]="set.type === SetType.NORMAL ? (i+1).toString() : 
+                             (set.type === SetType.WARMUP ? 'W' : 
+                             (set.type === SetType.DROPSET ? 'D' : 'F'))"
+              [weight]="set.weight || 0"
+              [reps]="set.reps || 0"
+              [completed]="set.completed || false"
+              (toggle)="toggleSetComplete(exercise, set)">
+            </app-exercise-set>
+          </div>
           
-          <ion-item *ngIf="!exercise.exerciseSetIds?.length" lines="none">
+          <ion-item *ngIf="!exercise.sets?.length" lines="none">
             <ion-label color="medium" class="ion-text-center">
               No sets added. Tap + to add a set.
             </ion-label>
@@ -72,7 +75,7 @@
     <div *ngIf="exercises.length === 0" class="ion-padding ion-text-center">
       <p>No exercises added yet.</p>
     </div>
-
+    
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button (click)="addExercise()">
         <ion-icon name="add"></ion-icon>

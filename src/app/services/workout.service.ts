@@ -23,7 +23,7 @@ export class WorkoutService {
   ) {}
 
   getUserWorkouts(): Observable<Workout[]> {
-    return this.http.get<Workout[]>(this.apiUrl);
+    return this.http.get<Workout[]>(`${this.apiUrl}`);
   }
 
   getById(id: string): Observable<Workout> {
@@ -43,7 +43,46 @@ export class WorkoutService {
   }
 
   getExercisesForWorkout(workoutId: string): Observable<Exercise[]> {
-    return this.http.get<Exercise[]>(`${this.apiUrl}/${workoutId}/exercises`);
+    return this.http.get<Exercise[]>(`${this.apiUrl}/${workoutId}/exercises`).pipe(
+      switchMap(exercises => {
+        // Fetch templates for exercises that have a template ID but no name
+        const templateRequests = exercises
+          .filter(ex => ex.exerciseTemplateId && !ex.name)
+          .map(ex => this.exerciseTemplateService.getTemplateById(ex.exerciseTemplateId!)
+            .pipe(
+              map(template => ({
+                exerciseId: ex.exerciseId,
+                templateName: template.name
+              })),
+              catchError(() => of({ exerciseId: ex.exerciseId, templateName: 'Unknown Exercise' }))
+            )
+          );
+
+        if (templateRequests.length === 0) {
+          return of(exercises);
+        }
+
+        return forkJoin(templateRequests).pipe(
+          map(templates => {
+            // Create a map of exercise ID to template name
+            const nameMap = new Map(
+              templates.map(t => [t.exerciseId, t.templateName])
+            );
+            
+            // Update each exercise with its template name if needed
+            return exercises.map(ex => {
+              if (ex.exerciseId && nameMap.has(ex.exerciseId) && !ex.name) {
+                return {
+                  ...ex,
+                  name: nameMap.get(ex.exerciseId) || 'Unknown Exercise'
+                };
+              }
+              return ex;
+            });
+          })
+        );
+      })
+    );
   }
 
   addExerciseToWorkout(workoutId: string, exerciseId: string): Observable<Workout> {
@@ -68,37 +107,148 @@ export class WorkoutService {
     return this.activeWorkoutService.startWorkout(activeWorkout);
   }
 
-
   getExerciseTemplates(): Observable<ExerciseTemplate[]> {
     return this.exerciseTemplateService.getAllTemplates();
   }
 
-  // Add this method to properly handle the exercises with sets
   createWorkoutWithExercises(workout: Workout, exercises: Exercise[]): Observable<Workout> {
-    // First create the workout
     return this.http.post<Workout>(`${this.apiUrl}`, workout).pipe(
       switchMap(createdWorkout => {
-        if (!createdWorkout.workoutId) {
-          return throwError(() => new Error('Failed to create workout - no ID returned'));
+        if (exercises.length === 0) {
+          return of(createdWorkout);
         }
         
-        // Then add each exercise with sets to the workout
-        const addExercises$ = exercises.map(exercise => {
-          // Set the workoutId on the exercise
-          exercise.workoutId = createdWorkout.workoutId;
+        const exerciseRequests = exercises.map(exercise => {
+          // Make sure to include exerciseTemplateId in the payload
+          const exercisePayload = {
+            ...exercise,
+            workoutId: createdWorkout.workoutId,
+            exerciseTemplateId: exercise.exerciseTemplateId // Make sure it's included
+          };
           
-          // Add the exercise to the workout
           return this.http.post<Exercise>(
-            `${this.apiUrl}/${createdWorkout.workoutId}/exercises`, 
-            exercise
+            `${this.apiUrl}/${createdWorkout.workoutId}/exercises`,
+            exercisePayload
           );
         });
         
-        // Wait for all exercises to be added
-        return forkJoin(addExercises$).pipe(
-          map(() => createdWorkout) // Return the created workout
+        return forkJoin(exerciseRequests).pipe(
+          map(() => createdWorkout)
         );
       })
     );
+  }
+
+  updateWorkoutWithExercises(workout: Workout, exercises: Exercise[]): Observable<Workout> {
+    return this.http.put<Workout>(`${this.apiUrl}/${workout.workoutId}`, workout).pipe(
+      switchMap(updatedWorkout => {
+        return this.getExercisesForWorkout(updatedWorkout.workoutId!).pipe(
+          switchMap(existingExercises => {
+            const existingExerciseMap = new Map(
+              existingExercises.map(e => [e.exerciseId, e])
+            );
+            
+            const exerciseRequests = exercises.map(exercise => {
+              // Create payload ensuring exerciseTemplateId is included
+              const exercisePayload = {
+                ...exercise,
+                workoutId: updatedWorkout.workoutId,
+                exerciseTemplateId: exercise.exerciseTemplateId // Make sure it's included
+              };
+              
+              if (exercise.exerciseId && existingExerciseMap.has(exercise.exerciseId)) {
+                return this.http.put<Exercise>(
+                  `${this.apiUrl}/${updatedWorkout.workoutId}/exercises/${exercise.exerciseId}`,
+                  exercisePayload
+                );
+              } else {
+                return this.http.post<Exercise>(
+                  `${this.apiUrl}/${updatedWorkout.workoutId}/exercises`,
+                  exercisePayload
+                );
+              }
+            });
+            
+            const newExerciseIds = new Set(
+              exercises
+                .filter(e => e.exerciseId)
+                .map(e => e.exerciseId)
+            );
+            
+            const deleteRequests = existingExercises
+              .filter(e => e.exerciseId && !newExerciseIds.has(e.exerciseId))
+              .map(e => this.http.delete(
+                `${this.apiUrl}/${updatedWorkout.workoutId}/exercises/${e.exerciseId}`
+              ));
+            
+            return forkJoin([...exerciseRequests, ...deleteRequests]).pipe(
+              map(() => updatedWorkout)
+            );
+          })
+        );
+      })
+    );
+  }
+
+  getExerciseSetsForExercise(workoutId: string, exerciseId: string): Observable<ExerciseSet[]> {
+    return this.http.get<ExerciseSet[]>(
+      `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets`
+    );
+  }
+
+  getWorkoutsWithExercises(): Observable<{workout: Workout, exercises: Exercise[]}[]> {
+    return this.getUserWorkouts().pipe(
+      switchMap(workouts => {
+        if (workouts.length === 0) {
+          return of([]);
+        }
+        
+        const workoutWithExercisesRequests = workouts.map(workout => {
+          if (!workout.workoutId) {
+            return of({ workout, exercises: [] });
+          }
+          
+          return this.getExercisesForWorkout(workout.workoutId).pipe(
+            map(exercises => ({
+              workout,
+              exercises
+            })),
+            catchError(err => {
+              console.error(`Error fetching exercises for workout ${workout.workoutId}:`, err);
+              return of({ workout, exercises: [] });
+            })
+          );
+        });
+        
+        return forkJoin(workoutWithExercisesRequests);
+      }),
+      catchError(error => {
+        console.error('Error in getWorkoutsWithExercises:', error);
+        return of([]);
+      })
+    );
+  }
+
+  loadExerciseWithSets(workoutId: string, exerciseId: string): Observable<Exercise> {
+    return this.getWorkoutExerciseById(workoutId, exerciseId).pipe(
+      switchMap(exercise => {
+        if (!exercise.exerciseSetIds?.length) {
+          return of(exercise);
+        }
+        
+        return this.getExerciseSetsForExercise(workoutId, exerciseId).pipe(
+          map(sets => {
+            return {
+              ...exercise,
+              sets: sets
+            };
+          })
+        );
+      })
+    );
+  }
+
+  getWorkoutExerciseById(workoutId: string, exerciseId: string): Observable<Exercise> {
+    return this.http.get<Exercise>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}`);
   }
 }

@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, IonicModule, ToastController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { interval, Subscription, firstValueFrom } from 'rxjs';
+import { interval, Subscription, firstValueFrom, forkJoin, of } from 'rxjs';
 import { ActiveWorkout } from '../models/active-workout.model';
 import { Exercise } from '../models/exercise.model';
 import { ExerciseSet } from '../models/exercise-set.model';
@@ -28,9 +28,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   timerSubscription: Subscription | null = null;
   workoutSubscription: Subscription | null = null;
   showCompletedSets = false;
-
-  private setDetails: Map<string, ExerciseSet> = new Map();
-  private normalSetCounts: Map<string, number> = new Map();
+  SetType = SetType; // Make enum available to template
 
   constructor(
     private activeWorkoutService: ActiveWorkoutService,
@@ -63,7 +61,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   }
 
   loadWorkout() {
-    
     const workoutId = this.route.snapshot.paramMap.get('id');
     
     if (workoutId) {
@@ -90,66 +87,36 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
 
     this.activeWorkoutService.getExercisesByWorkoutId(this.workout.workoutId).subscribe({
       next: (exercises: Exercise[]) => {
-        this.exercises = exercises;
-        
-        // Fetch set details for each exercise
-        exercises.forEach(exercise => {
+        // Load sets for each exercise if they have exerciseSetIds
+        const exerciseLoads = exercises.map(exercise => {
           if (exercise.exerciseId && exercise.exerciseSetIds && exercise.exerciseSetIds.length > 0) {
-            this.loadExerciseSets(exercise);
+            return this.workoutService.loadExerciseWithSets(this.workout!.workoutId!, exercise.exerciseId);
+          } else {
+            return of(exercise);
           }
         });
-        
-        if (!this.workoutActive && this.workout) {
-          this.resumeWorkout();
+
+        if (exerciseLoads.length > 0) {
+          forkJoin(exerciseLoads).subscribe(exercisesWithSets => {
+            this.exercises = exercisesWithSets;
+            
+            if (!this.workoutActive && this.workout) {
+              this.resumeWorkout();
+            }
+          });
+        } else {
+          this.exercises = exercises;
+          
+          if (!this.workoutActive && this.workout) {
+            this.resumeWorkout();
+          }
         }
       },
       error: (error: Error) => {
+        console.error('Error loading exercises:', error);
         this.showToast('Error loading exercises');
       }
     });
-  }
-
-  loadExerciseSets(exercise: Exercise) {
-    if (!exercise.exerciseId || !this.workout?.workoutId) return;
-    
-    this.activeWorkoutService.getExerciseSets(
-      this.workout.workoutId, 
-      exercise.exerciseId
-    ).subscribe({
-      next: (sets: ExerciseSet[]) => {
-        // Store each set in the map by ID
-        sets.forEach(set => {
-          if (set.exerciseSetId) {
-            this.setDetails.set(set.exerciseSetId, set);
-          }
-        });
-        
-
-        if (exercise.exerciseId) {
-          this.updateNormalSetCounts(exercise.exerciseId, sets);
-        }
-      }
-    });
-  }
-
-  updateNormalSetCounts(exerciseId: string, sets: ExerciseSet[]) {
-    let normalSetCount = 0;
-    sets.forEach((set) => {
-      if (set.type === SetType.NORMAL) {
-        normalSetCount++;
-        if (set.exerciseSetId) {
-          this.normalSetCounts.set(set.exerciseSetId, normalSetCount);
-        }
-      }
-    });
-  }
-
-  getSetDetails(setId: string): ExerciseSet | undefined {
-    return this.setDetails.get(setId);
-  }
-
-  getNormalSetCount(setId: string): number {
-    return this.normalSetCounts.get(setId) || 0;
   }
 
   startNewWorkout(activeWorkout: ActiveWorkout) {
@@ -234,15 +201,17 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
                   return;
                 }
 
-                // Create exercise object from template
                 const exercise: Exercise = {
                   workoutId: this.workout.workoutId,
-                  exerciseTemplateId: templateId,
+                  exerciseTemplateId: templateId, 
                   name: selectedTemplate.name,
-                  description: selectedTemplate.description
+                  notes: '',
+                  sets: [] 
                 };
 
-                // Add exercise to active workout using the new endpoint
+                console.log('Adding exercise with template ID:', exercise.exerciseTemplateId);
+                
+                // Add exercise to active workout
                 await firstValueFrom(
                   this.activeWorkoutService.addExerciseToWorkout(
                     this.workout.workoutId,
@@ -290,7 +259,8 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         {
           name: 'restTime',
           type: 'number',
-          placeholder: 'Rest time (seconds)'
+          placeholder: 'Rest time (seconds)',
+          value: exercise.restTimeSeconds || 60
         }
       ],
       buttons: [
@@ -301,15 +271,19 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         {
           text: 'Add',
           handler: (data) => {
+            // Create new set with the embedded model approach
             const newSet: ExerciseSet = {
               exerciseId: exercise.exerciseId!,
-              orderPosition: (exercise.exerciseSetIds?.length || 0) + 1,
+              orderPosition: (exercise.sets?.length || 0) + 1,
               reps: parseInt(data.reps) || 0,
               weight: parseFloat(data.weight) || 0,
               restTimeSeconds: parseInt(data.restTime) || 60,
               type: SetType.NORMAL,
               completed: false
             };
+            
+            // Update the exercise's restTimeSeconds for future sets
+            exercise.restTimeSeconds = newSet.restTimeSeconds;
             
             // Use activeWorkoutService to add set to exercise in active workout
             this.activeWorkoutService.addSetToExercise(
@@ -334,21 +308,27 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     await alert.present();
   }
 
-  toggleSetComplete(exercise: Exercise, setId: string) {
-    if (!exercise.exerciseId || !this.workout?.workoutId) {
-      this.showToast('Cannot update set: Invalid exercise');
+  toggleSetComplete(exercise: Exercise, set: ExerciseSet) {
+    if (!exercise.exerciseId || !this.workout?.workoutId || !set.exerciseSetId) {
+      this.showToast('Cannot update set: Invalid set information');
       return;
     }
 
-    this.activeWorkoutService.completeSet(
+    // Toggle the completed status locally
+    set.completed = !set.completed;
+
+    this.activeWorkoutService.updateSet(
       this.workout.workoutId,
       exercise.exerciseId,
-      setId
+      set.exerciseSetId,
+      set
     ).subscribe({
       next: () => {
-        this.loadWorkoutExercises();
+        // No need to reload, we already updated locally
       },
       error: () => {
+        // Revert the change if the API call fails
+        set.completed = !set.completed;
         this.showToast('Failed to update set');
       }
     });
@@ -431,4 +411,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     });
     toast.present();
   }
+
 }
+
+

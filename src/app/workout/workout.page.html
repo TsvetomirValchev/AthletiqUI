@@ -1,74 +1,88 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Workouts</ion-title>
+    <ion-title>Workout</ion-title>
     <ion-buttons slot="end">
-      <ion-button routerLink="/tabs/settings">
-        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-      </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <div class="quick-actions ion-padding">
-    <ion-button expand="block" color="primary" (click)="startEmptyWorkout()">
-      <ion-icon name="add-outline" slot="start"></ion-icon>
+<ion-content class="dark-theme">
+  <!-- Quick Start Section -->
+  <div class="section">
+    <div class="section-header">Quick Start</div>
+    <ion-button expand="block" class="action-button" (click)="startEmptyWorkout()">
+      <ion-icon name="add" slot="start"></ion-icon>
       Start Empty Workout
-    </ion-button>
-    
-    <ion-button expand="block" color="secondary" routerLink="/create-routine">
-      <ion-icon name="create-outline" slot="start"></ion-icon>
-      Create New Routine
-    </ion-button>
-
-    <ion-button expand="block" color="tertiary" routerLink="/browse-exercises">
-      <ion-icon name="search-outline" slot="start"></ion-icon>
-      Browse Exercises
     </ion-button>
   </div>
 
-  <ion-list-header>
-    <ion-label>My Routines</ion-label>
-  </ion-list-header>
+  <!-- Routines Section -->
+  <div class="section">
+    <div class="routines-header">
+      <div class="section-header">Routines</div>
+      <ion-buttons>
+        <ion-button class="add-button">
+          <ion-icon name="add-outline"></ion-icon>
+        </ion-button>
+      </ion-buttons>
+    </div>
 
-  <!-- Workout Cards -->
-  <ion-card *ngFor="let workout of workouts" class="workout-card">
-    <ion-card-header>
-      <ion-card-title>{{ workout.name }}</ion-card-title>
-    </ion-card-header>
-    
-    <ion-card-content>
-      <!-- Exercise List -->
-      <ion-list lines="full">
-        <ion-item *ngFor="let exercise of getWorkoutExercises(workout.workoutId!)">
-          <ion-icon name="barbell-outline" slot="start" color="primary"></ion-icon>
-          <ion-label>{{ exercise.name }}</ion-label>
-          <ion-note slot="end" *ngIf="exercise.totalSets">
-            {{ exercise.totalSets }} sets
-          </ion-note>
-        </ion-item>
-        
-        <ion-item *ngIf="getWorkoutExercises(workout.workoutId!).length === 0">
-          <ion-label color="medium">No exercises in this routine</ion-label>
-        </ion-item>
-      </ion-list>
+    <div class="routines-actions">
+      <ion-button expand="block" class="new-routine-button" routerLink="/create-routine">
+        <ion-icon name="document-text-outline" slot="start"></ion-icon>
+        New Routine
+      </ion-button>
       
-      <div class="workout-actions">
-        <ion-button expand="block" color="success" (click)="startWorkout(workout)">
-          <ion-icon name="play" slot="start"></ion-icon>
-          Start Workout
-        </ion-button>
-        
-        <ion-button expand="block" color="danger" (click)="deleteWorkout(workout)">
-          <ion-icon name="trash" slot="start"></ion-icon>
-          Delete
-        </ion-button>
+      <ion-button expand="block" class="explore-button" routerLink="/browse-exercises">
+        <ion-icon name="search-outline" slot="start"></ion-icon>
+        Explore
+      </ion-button>
+    </div>
+
+    <!-- My Routines Section -->
+    <div class="my-routines">
+      <div class="my-routines-header">
+        <ion-icon name="chevron-down-outline"></ion-icon>
+        <span>My Routines ({{workouts.length}})</span>
       </div>
-    </ion-card-content>
-  </ion-card>
-  
-  <div *ngIf="workouts.length === 0" class="ion-padding ion-text-center">
-    <ion-icon name="barbell-outline" size="large" color="medium"></ion-icon>
-    <p>No saved routines found. Create one by tapping "Create New Routine"</p>
+      
+      <!-- Loading Indicator -->
+      <div *ngIf="isLoading" class="loading-container">
+        <ion-spinner></ion-spinner>
+      </div>
+
+      <!-- No Routines Message -->
+      <div *ngIf="!isLoading && workouts.length === 0" class="empty-state">
+        <p>No saved routines yet</p>
+      </div>
+
+      <!-- Routine Cards -->
+      <div class="workout-cards">
+        <div *ngFor="let workout of workouts" class="workout-card">
+          <div class="workout-header">
+            <h3 class="workout-title">{{workout.name}}</h3>
+            <ion-button fill="clear" class="options-btn" (click)="presentOptions(workout)">
+              <ion-icon name="ellipsis-horizontal"></ion-icon>
+            </ion-button>
+          </div>
+          
+          <div class="exercise-names">
+            <p class="exercise-summary">
+              <ng-container *ngIf="getWorkoutExercises(workout.workoutId!).length > 0; else noExercises">
+                <ng-container *ngFor="let exercise of getWorkoutExercises(workout.workoutId!); let i = index; let last = last">
+                  {{ exercise.name }}{{ !last ? ', ' : '' }}
+                </ng-container>
+              </ng-container>
+              <ng-template #noExercises>No exercises</ng-template>
+            </p>
+          </div>
+          
+          <ion-button expand="block" class="start-button" (click)="startWorkout(workout)">
+            <ion-icon name="play" slot="start"></ion-icon>
+            Start Routine
+          </ion-button>
+        </div>
+      </div>
+    </div>
   </div>
 </ion-content>

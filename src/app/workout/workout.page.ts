@@ -1,13 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { WorkoutService } from '../services/workout.service';
 import { Workout } from '../models/workout.model';
-import { IonicModule, AlertController } from '@ionic/angular';
+import { IonicModule, AlertController, ActionSheetController, ToastController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { Exercise } from '../models/exercise.model';
-import { ExerciseTemplate } from '../models/exercise-template.model';
-import { catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
+import { forkJoin, of } from 'rxjs';
 
 @Component({
   selector: 'app-workout',
@@ -24,8 +23,10 @@ export class WorkoutPage implements OnInit {
   constructor(
     private workoutService: WorkoutService,
     private router: Router,
-    private alertController: AlertController
-  ) { }
+    private alertController: AlertController,
+    private actionSheetController: ActionSheetController,
+    private toastController: ToastController
+  ) {}
 
   ngOnInit() {
     this.loadWorkouts();
@@ -33,88 +34,125 @@ export class WorkoutPage implements OnInit {
 
   loadWorkouts() {
     this.isLoading = true;
-    this.workoutService.getUserWorkouts().subscribe({
-      next: (workouts: Workout[]) => {
-        this.workouts = workouts;
-        // Load exercises for each workout
-        this.loadAllExercises();
+    
+    this.workoutService.getWorkoutsWithExercises().subscribe({
+      next: (workoutsWithExercises) => {
+        console.log('Loaded workouts with exercises:', workoutsWithExercises);
+        
+        // Extract workouts
+        this.workouts = workoutsWithExercises.map(item => item.workout);
+        
+        // Create map of workout ID to exercises
+        this.workoutExercises.clear();
+        workoutsWithExercises.forEach(item => {
+          if (item.workout.workoutId) {
+            this.workoutExercises.set(item.workout.workoutId, item.exercises || []);
+          }
+        });
+        
+        this.isLoading = false;
       },
-      error: (error: Error) => {
-        console.error('Error loading workouts:', error);
+      error: (error) => {
+        console.error('Error loading workouts with exercises:', error);
+        this.showToast('Failed to load workouts');
         this.isLoading = false;
       }
     });
   }
 
-  loadAllExercises() {
-    if (this.workouts.length === 0) {
-      this.isLoading = false;
-      return;
-    }
-    
-    this.workouts
-      .filter(workout => workout.workoutId)
-      .forEach(workout => {
-        if (!workout.workoutId) return;
-        
-        this.workoutService.getExercisesForWorkout(workout.workoutId)
-          .pipe(
-            catchError(err => {
-              console.error(`Error fetching exercises for workout ${workout.workoutId}:`, err);
-              return of([]);
-            })
-          )
-          .subscribe({
-            next: (exercises) => {
-              this.workoutExercises.set(workout.workoutId!, exercises);
-            },
-            complete: () => {
-              this.isLoading = false;
-            }
-          });
-      });
-  }
-
   getWorkoutExercises(workoutId: string): Exercise[] {
-    return this.workoutExercises.get(workoutId) || [];
+    const exercises = this.workoutExercises.get(workoutId) || [];
+    console.log(`Getting exercises for workout ${workoutId}:`, exercises);
+    return exercises;
   }
 
   startEmptyWorkout() {
     const newWorkout: Workout = {
       name: `Workout ${new Date().toLocaleDateString()}`,
-      exerciseIds: []
     };
 
     this.workoutService.createWorkout(newWorkout).subscribe({
       next: (createdWorkout: Workout) => {
         this.workoutService.startWorkout(createdWorkout).subscribe({
           next: (activeWorkout: any) => {
-            this.router.navigate(['/active-workout'], { 
-              queryParams: { workoutId: activeWorkout.workoutId }
-            });
+            this.router.navigate(['/active-workout', activeWorkout.workoutId]);
           },
           error: (error: Error) => {
             console.error('Error starting workout:', error);
+            this.showToast('Failed to start workout');
           }
         });
       },
       error: (error: Error) => {
         console.error('Error creating workout:', error);
+        this.showToast('Failed to create workout');
       }
+    });
+  }
+
+  async presentOptions(workout: Workout) {
+    const actionSheet = await this.actionSheetController.create({
+      header: workout.name,
+      buttons: [
+        {
+          text: 'Edit Routine',
+          icon: 'create-outline',
+          handler: () => {
+            this.editWorkout(workout);
+          }
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          icon: 'trash-outline',
+          handler: () => {
+            this.deleteWorkout(workout);
+          }
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          icon: 'close'
+        }
+      ]
+    });
+    
+    await actionSheet.present();
+  }
+
+  editWorkout(workout: Workout) {
+    if (!workout.workoutId) return;
+    
+    // Navigate to create-routine page with workout ID to load for editing
+    this.router.navigate(['/create-routine'], { 
+      queryParams: { workoutId: workout.workoutId }
     });
   }
 
   startWorkout(workout: Workout) {
     if (!workout.workoutId) return;
 
-    this.workoutService.startWorkout(workout).subscribe({
-      next: (activeWorkout: any) => {
-        this.router.navigate(['/active-workout'], { 
-          queryParams: { workoutId: activeWorkout.workoutId }
+    // Make sure to load the complete workout with all details
+    this.isLoading = true;
+    
+    this.workoutService.getById(workout.workoutId).subscribe({
+      next: (completeWorkout: Workout) => {
+        this.workoutService.startWorkout(completeWorkout).subscribe({
+          next: (activeWorkout: any) => {
+            this.isLoading = false;
+            this.router.navigate(['/active-workout', activeWorkout.workoutId]);
+          },
+          error: (error: Error) => {
+            this.isLoading = false;
+            console.error('Error starting workout:', error);
+            this.showToast('Failed to start workout');
+          }
         });
       },
       error: (error: Error) => {
-        console.error('Error starting workout:', error);
+        this.isLoading = false;
+        console.error('Error loading complete workout:', error);
+        this.showToast('Failed to load workout details');
       }
     });
   }
@@ -135,9 +173,11 @@ export class WorkoutPage implements OnInit {
               this.workoutService.deleteWorkout(workout.workoutId).subscribe({
                 next: () => {
                   this.workouts = this.workouts.filter(w => w.workoutId !== workout.workoutId);
+                  this.showToast('Workout deleted successfully');
                 },
                 error: (error: Error) => {
                   console.error('Error deleting workout:', error);
+                  this.showToast('Failed to delete workout');
                 }
               });
             }
@@ -147,6 +187,15 @@ export class WorkoutPage implements OnInit {
     });
 
     await alert.present();
+  }
+
+  async showToast(message: string) {
+    const toast = await this.toastController.create({
+      message,
+      duration: 2000,
+      position: 'bottom'
+    });
+    await toast.present();
   }
 
   ionViewWillEnter() {

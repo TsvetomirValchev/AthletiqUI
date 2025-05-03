@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { Observable, BehaviorSubject, throwError } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { ActiveWorkout } from '../models/active-workout.model';
 import { Exercise } from '../models/exercise.model';
@@ -55,10 +55,19 @@ export class ActiveWorkoutService {
   }
 
   addExerciseToWorkout(workoutId: string, exercise: Exercise): Observable<ActiveWorkout> {
-    return this.http.post<ActiveWorkout>(`${this.apiUrl}/${workoutId}/exercises`, exercise)
-      .pipe(
-        tap(updatedWorkout => this.currentWorkoutSubject.next(updatedWorkout))
-      );
+    // Create a copy of the exercise to ensure we don't drop any properties
+    const exercisePayload = {
+      ...exercise,
+      workoutId: workoutId,
+      exerciseTemplateId: exercise.exerciseTemplateId // Explicitly include this
+    };
+    
+    return this.http.post<ActiveWorkout>(
+      `${this.apiUrl}/${workoutId}/exercises`, 
+      exercisePayload
+    ).pipe(
+      tap(updatedWorkout => this.currentWorkoutSubject.next(updatedWorkout))
+    );
   }
 
   getWorkoutExerciseById(workoutId: string, exerciseId: string): Observable<Exercise> {
@@ -103,4 +112,19 @@ export class ActiveWorkoutService {
         tap(updatedWorkout => this.currentWorkoutSubject.next(updatedWorkout))
       );
   }
+
+  updateSet(workoutId: string, exerciseId: string, setId: string, set: ExerciseSet): Observable<any> {
+    return this.http.put<any>(
+      `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets/${setId}`, 
+      set
+    ).pipe(
+      tap(() => {
+      }),
+      catchError(error => {
+        console.error('Error updating set:', error);
+        return throwError(() => new Error('Failed to update set'));
+      })
+    );
+  }
+
 }
