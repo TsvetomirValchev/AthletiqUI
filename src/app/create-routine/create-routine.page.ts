@@ -25,6 +25,7 @@ export class CreateRoutinePage implements OnInit {
   exercises: Exercise[] = []; // Replace exerciseConfigs with exercises
   SetType = SetType; // Make enum available to template
   isLoading = false;
+  showLibraryOnMobile = false;
   private tempExerciseSets = new Map<string, ExerciseSet[]>();
   private tempNewExerciseSets = new Map<number, ExerciseSet[]>();
 
@@ -154,31 +155,73 @@ export class CreateRoutinePage implements OnInit {
     if (exerciseIndex >= 0 && exerciseIndex < this.exercises.length) {
       const exercise = this.exercises[exerciseIndex];
       
-      // Create a new set
+      // Ensure exercise.sets is initialized if it doesn't exist
+      if (!exercise.sets) {
+        exercise.sets = [];
+      }
+      
+      // Create new set
       const newSet: ExerciseSet = {
         type: SetType.NORMAL,
-        orderPosition: this.getNextSetOrderPosition(exercise),
+        orderPosition: exercise.sets.length + 1,
         reps: 0,
         weight: 0,
         restTimeSeconds: 0,
         completed: false
       };
       
-      if (!exercise.exerciseId) {
-        // For new exercises without an ID yet, store the set temporarily
-        if (!this.tempNewExerciseSets.has(exerciseIndex)) {
-          this.tempNewExerciseSets.set(exerciseIndex, []);
-        }
-        this.tempNewExerciseSets.get(exerciseIndex)!.push(newSet);
-      } else {
-        // For existing exercises with an ID
-        if (!this.tempExerciseSets.has(exercise.exerciseId)) {
-          this.tempExerciseSets.set(exercise.exerciseId, []);
-        }
-        this.tempExerciseSets.get(exercise.exerciseId)!.push(newSet);
-      }
+      // Get the current workout ID from the route
+      const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
       
-      this.changeDetector.markForCheck();
+      // For existing exercises with IDs and existing workouts
+      if (exercise.exerciseId && workoutId) {
+        this.workoutService.addSetToExercise(workoutId, exercise.exerciseId, newSet)
+          .subscribe({
+            next: () => {
+              // Success - add to local UI array too to avoid reloading
+              if (!exercise.sets) {
+                exercise.sets = [];
+              }
+              exercise.sets.push(newSet);
+              this.showToast('Set added successfully');
+            },
+            error: (error) => {
+              console.error('Error adding set:', error);
+              this.showToast('Failed to add set');
+            }
+          });
+      } else {
+          // Add set to the UI array
+        if (!exercise.sets) {
+          exercise.sets = [];
+        }
+        // Safely push to exercise sets
+        exercise.sets?.push(newSet) || (exercise.sets = [newSet]);
+        
+        // Also store in temporary storage for later saving
+        if (exercise.exerciseId) {
+          // For existing exercises with IDs
+          if (!this.tempExerciseSets.has(exercise.exerciseId)) {
+            this.tempExerciseSets.set(exercise.exerciseId, [newSet]);
+          } else {
+            const currentSets = this.tempExerciseSets.get(exercise.exerciseId) || [];
+            this.tempExerciseSets.set(exercise.exerciseId, [...currentSets, newSet]);
+          }
+        } else {
+          // For new exercises without IDs
+          const index = this.exercises.indexOf(exercise);
+          if (!this.tempNewExerciseSets.has(index)) {
+            this.tempNewExerciseSets.set(index, [newSet]);
+          } else {
+            const currentSets = this.tempNewExerciseSets.get(index) || [];
+            this.tempNewExerciseSets.set(index, [...currentSets, newSet]);
+          }
+        }
+        
+        // Ensure change detection runs
+        this.changeDetector.markForCheck();
+        this.changeDetector.detectChanges();
+      }
     }
   }
 
@@ -236,17 +279,22 @@ export class CreateRoutinePage implements OnInit {
         workoutId: workoutId || undefined
       };
       
-      // Make sure to capture the exerciseTemplateId for each exercise
-      const exercisesToSave: Exercise[] = this.exercises.map(exercise => {
+      // Make sure all exercises have their sets properly attached
+      const exercisesToSave: Exercise[] = this.exercises.map((exercise, index) => {
         let exerciseCopy: Exercise = { ...exercise };
         
+        // First, try to get sets from the exercise object itself
+        let sets = [...(exercise.sets || [])];
+        
+        // If the exercise has an ID, check the tempExerciseSets map
         if (exercise.exerciseId && this.tempExerciseSets.has(exercise.exerciseId)) {
-          exerciseCopy.sets = this.tempExerciseSets.get(exercise.exerciseId);
+          // Merge with any sets from tempExerciseSets
+          const tempSets = this.tempExerciseSets.get(exercise.exerciseId) || [];
+          sets = [...sets, ...tempSets];
         } else {
-          const index = this.exercises.indexOf(exercise);
-          if (this.tempNewExerciseSets.has(index)) {
-            exerciseCopy.sets = this.tempNewExerciseSets.get(index);
-          }
+          // For new exercises without IDs, check tempNewExerciseSets using the index
+          const tempSets = this.tempNewExerciseSets.get(index) || [];
+          sets = [...sets, ...tempSets];
         }
         
         // Ensure exerciseTemplateId is preserved
@@ -254,26 +302,45 @@ export class CreateRoutinePage implements OnInit {
           exerciseCopy.exerciseTemplateId = exercise.exerciseTemplateId;
         }
         
+        // Assign the merged sets
+        exerciseCopy.sets = sets;
+        
         return exerciseCopy;
       });
       
-      // The rest of your code remains the same
-      const workoutOperation = workoutId 
-        ? this.workoutService.updateWorkoutWithExercises(workoutData, exercisesToSave)
-        : this.workoutService.createWorkoutWithExercises(workoutData, exercisesToSave);
-
-      workoutOperation.subscribe({
-        next: () => {
-          this.showToast(workoutId ? 'Workout updated successfully' : 'Workout created successfully');
-          this.router.navigate(['/tabs/workouts']);
-        },
-        error: (error) => {
-          console.error(workoutId ? 'Error updating workout:' : 'Error saving workout:', error);
-          this.showToast(workoutId ? 'Failed to update workout' : 'Failed to save workout');
-        }
-      });
-    } else {
-      this.showToast('Please enter a workout name (minimum 3 characters)');
+      // If we're editing an existing workout
+      if (workoutId) {
+        this.workoutService.updateWorkoutWithExercises(workoutData, exercisesToSave)
+          .subscribe({
+            next: () => {
+              this.router.navigate(['/tabs/workouts']);
+              this.showToast('Workout updated successfully');
+            },
+            error: (error) => {
+              console.error('Error updating workout:', error);
+              this.showToast('Error updating workout');
+            }
+          });
+      } else {
+        // If we're creating a new workout
+        this.workoutService.createWorkoutWithExercises(workoutData, exercisesToSave)
+          .subscribe({
+            next: () => {
+              // Force a refresh of the workout list before navigating
+              this.workoutService.refreshWorkouts().subscribe({
+                next: () => {
+                  this.router.navigate(['/tabs/workouts']);
+                  this.showToast('Workout created successfully');
+                },
+                error: (error) => console.error('Error refreshing workouts:', error)
+              });
+            },
+            error: (error) => {
+              console.error('Error creating workout:', error);
+              this.showToast('Error creating workout');
+            }
+          });
+      }
     }
   }
 
@@ -431,7 +498,8 @@ export class CreateRoutinePage implements OnInit {
     const toast = await this.toastController.create({
       message: message,
       duration: 2000,
-      position: 'bottom'
+      position: 'top', // Change position to top
+      cssClass: 'toast-notification' // Add a class for additional styling if needed
     });
     await toast.present();
   }
@@ -457,5 +525,22 @@ export class CreateRoutinePage implements OnInit {
     event.detail.complete();
   
     this.exercises = [...this.exercises];
+  }
+
+  toggleLibrary(show: boolean): void {
+    this.showLibraryOnMobile = show;
+  }
+
+  discardCreation(): void {
+    this.routineForm.reset();
+    
+    this.exercises = [];
+    
+    this.tempExerciseSets.clear();
+    this.tempNewExerciseSets.clear();
+    
+    this.showLibraryOnMobile = false;
+    
+    this.router.navigate(['/tabs/workouts']);
   }
 }

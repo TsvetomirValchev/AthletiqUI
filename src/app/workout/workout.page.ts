@@ -20,6 +20,9 @@ export class WorkoutPage implements OnInit {
   workoutExercises: Map<string, Exercise[]> = new Map();
   isLoading = false;
 
+  // Add a memoization cache for getWorkoutExercises
+  private exercisesCache = new Map<string, Exercise[]>();
+
   constructor(
     private workoutService: WorkoutService,
     private router: Router,
@@ -61,9 +64,18 @@ export class WorkoutPage implements OnInit {
   }
 
   getWorkoutExercises(workoutId: string): Exercise[] {
-    const exercises = this.workoutExercises.get(workoutId) || [];
-    console.log(`Getting exercises for workout ${workoutId}:`, exercises);
-    return exercises;
+    // Only log once per workoutId per page load
+    if (!this.exercisesCache.has(workoutId)) {
+      const exercises = this.workoutExercises.get(workoutId) || [];
+      console.log(`Getting exercises for workout ${workoutId}:`, exercises);
+      this.exercisesCache.set(workoutId, exercises);
+    }
+    return this.exercisesCache.get(workoutId) || [];
+  }
+
+  getWorkoutExerciseNames(workoutId: string): string {
+    const exercises = this.getWorkoutExercises(workoutId);
+    return exercises.map(ex => ex.name).join(', ');
   }
 
   startEmptyWorkout() {
@@ -199,6 +211,7 @@ export class WorkoutPage implements OnInit {
   }
 
   ionViewWillEnter() {
+    // This ensures the workouts are loaded whenever the page becomes visible
     this.loadWorkouts();
   }
 }

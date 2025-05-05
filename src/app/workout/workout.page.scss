@@ -72,9 +72,27 @@ ion-content {
   align-items: center;
   color: var(--text-color);
   margin-bottom: 12px;
+  padding: 12px 0;
+  cursor: pointer;
+  user-select: none;
   
   ion-icon {
     margin-right: 8px;
+    font-size: 18px;
+    transition: transform 0.2s;
+  }
+  
+  span {
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  &:hover {
+    opacity: 0.8;
+  }
+  
+  &:active {
+    opacity: 0.6;
   }
 }
 
@@ -137,4 +155,8 @@ ion-content {
   text-align: center;
   color: var(--text-secondary);
   padding: 16px;
+}
+
+.routine-content {
+  transition: max-height 0.3s ease-out;
 }

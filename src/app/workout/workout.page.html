@@ -20,11 +20,6 @@
   <div class="section">
     <div class="routines-header">
       <div class="section-header">Routines</div>
-      <ion-buttons>
-        <ion-button class="add-button">
-          <ion-icon name="add-outline"></ion-icon>
-        </ion-button>
-      </ion-buttons>
     </div>
 
     <div class="routines-actions">
@@ -42,11 +37,10 @@
     <!-- My Routines Section -->
     <div class="my-routines">
       <div class="my-routines-header">
-        <ion-icon name="chevron-down-outline"></ion-icon>
-        <span>My Routines ({{workouts.length}})</span>
+        My Routines ({{workouts.length}})
       </div>
       
-      <!-- Loading Indicator -->
+      
       <div *ngIf="isLoading" class="loading-container">
         <ion-spinner></ion-spinner>
       </div>
@@ -69,9 +63,7 @@
           <div class="exercise-names">
             <p class="exercise-summary">
               <ng-container *ngIf="getWorkoutExercises(workout.workoutId!).length > 0; else noExercises">
-                <ng-container *ngFor="let exercise of getWorkoutExercises(workout.workoutId!); let i = index; let last = last">
-                  {{ exercise.name }}{{ !last ? ', ' : '' }}
-                </ng-container>
+                {{ getWorkoutExerciseNames(workout.workoutId!) }}
               </ng-container>
               <ng-template #noExercises>No exercises</ng-template>
             </p>
