@@ -1,9 +1,15 @@
+import { ExerciseSet } from './exercise-set.model';
+
 export interface Exercise {
   exerciseId?: string;
-  name: string;
-  weight: number;
-  sets: number;
-  reps: number;
   workoutId?: string;
-  highestVolume?: Record<number, number>;
+  exerciseTemplateId?: string;
+  name: string;
+  notes?: string;
+  exerciseSetIds?: string[];
+  sets?: ExerciseSet[];
+  totalSets?: number;
+  maxWeight?: number;
+  totalReps?: number;
+  restTimeSeconds?: number; 
 }

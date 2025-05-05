@@ -4,6 +4,7 @@ import { AuthService } from './services/auth.service';
 import { WorkoutService } from './services/workout.service';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { Workout } from './models/workout.model';
 
 @Component({
   selector: 'app-root',
@@ -21,6 +22,8 @@ export class AppComponent {
     this.initializeApp();
   }
 
+  private _isActiveWorkoutInProgress = false;
+
   async initializeApp() {
     this.platform.ready().then(async () => {
       console.log('App initialized');
@@ -31,25 +34,28 @@ export class AppComponent {
     return this.authService.isLoggedInSync();
   }
   
+  
+  
   get isActiveWorkoutInProgress(): boolean {
-    return this.workoutService.isActiveWorkoutInProgress();
+    this.workoutService.isActiveWorkoutInProgress().subscribe((isActive: boolean) => {
+      this._isActiveWorkoutInProgress = isActive;
+    });
+    return this._isActiveWorkoutInProgress;
   }
   
   async startNewWorkout() {
-    // First navigate to workouts tab
     await this.router.navigateByUrl('/tabs/workouts');
     
-    // Then create and start a new workout
     const newWorkout = {
       name: `Quick Workout ${new Date().toLocaleDateString()}`,
       exercises: []
     };
     
     this.workoutService.createWorkout(newWorkout).subscribe({
-      next: async (createdWorkout) => {
-        await this.workoutService.startWorkout(createdWorkout);
+      next: (createdWorkout: Workout) => {
+        this.workoutService.startWorkout(createdWorkout);
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('Error creating workout:', error);
       }
     });

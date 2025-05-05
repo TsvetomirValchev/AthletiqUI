@@ -1,130 +1,141 @@
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
-import { IonicModule, ModalController, AlertController, ActionSheetController } from '@ionic/angular';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AlertController, IonicModule, ToastController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
-import { Subscription, interval } from 'rxjs';
-import { Workout } from '../models/workout.model';
+import { FormsModule } from '@angular/forms';
+import { interval, Subscription, firstValueFrom, forkJoin, of } from 'rxjs';
 import { ActiveWorkout } from '../models/active-workout.model';
 import { Exercise } from '../models/exercise.model';
+import { ExerciseSet } from '../models/exercise-set.model';
+import { ActiveWorkoutService } from '../services/active-workout.service';
+import { ExerciseTemplateService } from '../services/exercise-template.service';
 import { WorkoutService } from '../services/workout.service';
-import { Router } from '@angular/router';
+import { SetType } from '../models/set-type.enum';
+import { ExerciseSetComponent } from '../components/exercise-set/exercise-set.component';
 
 @Component({
   selector: 'app-active-workout',
   templateUrl: './active-workout.page.html',
   styleUrls: ['./active-workout.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule]
+  imports: [IonicModule, CommonModule, FormsModule, ExerciseSetComponent]
 })
 export class ActiveWorkoutPage implements OnInit, OnDestroy {
-  @Input() workoutId!: string;
-  workout: Workout | null = null;
-  
+  workout: ActiveWorkout | null = null;
   exercises: Exercise[] = [];
-  isLoading = false;
   workoutActive = false;
   elapsedTime = 0;
-  timerSubscription: Subscription | undefined;
-  restTimerActive = false;
-  restTimeRemaining = 0;
-  restTimerSubscription: Subscription | undefined;
-  
+  timerSubscription: Subscription | null = null;
+  workoutSubscription: Subscription | null = null;
+  showCompletedSets = false;
+  SetType = SetType; // Make enum available to template
+
   constructor(
+    private activeWorkoutService: ActiveWorkoutService,
     private workoutService: WorkoutService,
+    private exerciseTemplateService: ExerciseTemplateService,
+    private route: ActivatedRoute,
+    private router: Router,
     private alertController: AlertController,
-    private actionSheetController: ActionSheetController,
-    private router: Router
-  ) { }
+    private toastController: ToastController
+  ) {}
 
   ngOnInit() {
-    // Load workout if workoutId is provided
-    if (this.workoutId) {
-      this.loadWorkout(this.workoutId);
-    } else {
-      // Check if there's an active workout
-      this.workoutService.getCurrentActiveWorkout().subscribe({
-        next: (activeWorkout) => {
-          if (activeWorkout) {
-            this.workout = activeWorkout;
-            
-            // Calculate elapsed time if startTime exists
-            if (activeWorkout.startTime) {
-              const startTime = new Date(activeWorkout.startTime).getTime();
-              const now = new Date().getTime();
-              this.elapsedTime = Math.floor((now - startTime) / 1000);
-            }
-            
-            this.loadExercises(activeWorkout.workoutId!);
-            this.startWorkout();
-          }
-        },
-        error: (error) => {
-          console.error('Error loading active workout:', error);
+    this.loadWorkout();
+    
+    this.workoutSubscription = this.activeWorkoutService.currentWorkout$.subscribe(
+      workout => {
+        if (workout) {
+          this.workout = workout;
+          this.loadWorkoutExercises();
         }
-      });
-    }
+      }
+    );
   }
 
   ngOnDestroy() {
     this.stopWorkoutTimer();
-    this.stopRestTimer();
+    if (this.workoutSubscription) {
+      this.workoutSubscription.unsubscribe();
+    }
   }
 
-  loadWorkout(workoutId: string) {
-    this.isLoading = true;
-    this.workoutService.getWorkout(workoutId).subscribe({
-      next: (workout) => {
-        this.workout = workout;
-        this.loadExercises(workoutId);
-        this.startWorkout();
-      },
-      error: (error) => {
-        console.error('Error loading workout:', error);
-        this.isLoading = false;
-      }
-    });
-  }
-
-  loadExercises(workoutId: string) {
-    this.workoutService.getExercisesForWorkout(workoutId).subscribe({
-      next: (exercises) => {
-        this.exercises = exercises;
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading exercises:', error);
-        this.isLoading = false;
-      }
-    });
-  }
-
-  startWorkout() {
-    if (!this.workout) return;
+  loadWorkout() {
+    const workoutId = this.route.snapshot.paramMap.get('id');
     
-    this.workoutActive = true;
-    
-    if (this.workout.workoutId) {
-      if (!this.isActiveWorkout(this.workout)) {
-        this.workoutService.startWorkout(this.workout).subscribe({
-          next: (activeWorkout) => {
-            this.workout = activeWorkout;
-          },
-          error: (error) => {
-            console.error('Error starting workout:', error);
+    if (workoutId) {
+      this.workoutService.getById(workoutId).subscribe({
+        next: (workout) => {
+          const activeWorkout: ActiveWorkout = {
+            ...workout,
+            startTime: new Date().toISOString()
+          };
+          
+          this.startNewWorkout(activeWorkout);
+        },
+        error: (error: Error) => {
+          this.showToast('Error loading workout: ' + error.message);
+        }
+      });
+    } else {
+      this.activeWorkoutService.loadCurrentWorkout();
+    }
+  }
+
+  loadWorkoutExercises() {
+    if (!this.workout?.workoutId) return;
+
+    this.activeWorkoutService.getExercisesByWorkoutId(this.workout.workoutId).subscribe({
+      next: (exercises: Exercise[]) => {
+        // Load sets for each exercise if they have exerciseSetIds
+        const exerciseLoads = exercises.map(exercise => {
+          if (exercise.exerciseId && exercise.exerciseSetIds && exercise.exerciseSetIds.length > 0) {
+            return this.workoutService.loadExerciseWithSets(this.workout!.workoutId!, exercise.exerciseId);
+          } else {
+            return of(exercise);
           }
         });
+
+        if (exerciseLoads.length > 0) {
+          forkJoin(exerciseLoads).subscribe(exercisesWithSets => {
+            this.exercises = exercisesWithSets;
+            
+            if (!this.workoutActive && this.workout) {
+              this.resumeWorkout();
+            }
+          });
+        } else {
+          this.exercises = exercises;
+          
+          if (!this.workoutActive && this.workout) {
+            this.resumeWorkout();
+          }
+        }
+      },
+      error: (error: Error) => {
+        console.error('Error loading exercises:', error);
+        this.showToast('Error loading exercises');
       }
-    }
-    
-    this.timerSubscription = interval(1000).subscribe(() => {
-      this.elapsedTime++;
+    });
+  }
+
+  startNewWorkout(activeWorkout: ActiveWorkout) {
+    this.activeWorkoutService.startWorkout(activeWorkout).subscribe({
+      next: (startedWorkout) => {
+        this.workout = startedWorkout;
+        this.workoutActive = true;
+        this.resumeWorkout();
+        this.loadWorkoutExercises();
+      },
+      error: (error: Error) => {
+        this.showToast('Error starting workout: ' + error.message);
+      }
     });
   }
 
   pauseWorkout() {
-    if (this.timerSubscription) {
-      this.timerSubscription.unsubscribe();
-    }
     this.workoutActive = false;
+    this.stopWorkoutTimer();
   }
 
   resumeWorkout() {
@@ -137,6 +148,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   stopWorkoutTimer() {
     if (this.timerSubscription) {
       this.timerSubscription.unsubscribe();
+      this.timerSubscription = null;
     }
   }
 
@@ -153,28 +165,102 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       return;
     }
 
+    try {
+      const templates = await firstValueFrom(this.exerciseTemplateService.getAllTemplates());
+      
+      if (!templates || templates.length === 0) {
+        this.showToast('No exercise templates available');
+        return;
+      }
+      
+      const inputs = templates.map(template => ({
+        type: 'radio' as const,
+        label: template.name,
+        value: template.exerciseTemplateId
+      }));
+
+      const alert = await this.alertController.create({
+        header: 'Select Exercise',
+        inputs,
+        buttons: [
+          {
+            text: 'Cancel',
+            role: 'cancel'
+          },
+          {
+            text: 'Add',
+            handler: async (templateId) => {
+              if (!templateId) return;
+              
+              const selectedTemplate = templates.find(t => t.exerciseTemplateId === templateId);
+              if (!selectedTemplate) return;
+              
+              try {
+                if (!this.workout?.workoutId) {
+                  this.showToast('Cannot add exercise: No workout ID');
+                  return;
+                }
+
+                const exercise: Exercise = {
+                  workoutId: this.workout.workoutId,
+                  exerciseTemplateId: templateId, 
+                  name: selectedTemplate.name,
+                  notes: '',
+                  sets: [] 
+                };
+
+                console.log('Adding exercise with template ID:', exercise.exerciseTemplateId);
+                
+                // Add exercise to active workout
+                await firstValueFrom(
+                  this.activeWorkoutService.addExerciseToWorkout(
+                    this.workout.workoutId,
+                    exercise
+                  )
+                );
+                
+                this.loadWorkoutExercises();
+                this.showToast(`${selectedTemplate.name} added to workout`);
+              } catch (error) {
+                this.showToast('Failed to add exercise');
+                console.error('Error adding exercise:', error);
+              }
+            }
+          }
+        ]
+      });
+
+      await alert.present();
+    } catch (error) {
+      this.showToast('Error loading exercise templates');
+      console.error('Error in addExercise:', error);
+    }
+  }
+
+  async addSet(exercise: Exercise) {
+    if (!exercise.exerciseId || !this.workout?.workoutId) {
+      this.showToast('Cannot add set: Invalid exercise');
+      return;
+    }
+
     const alert = await this.alertController.create({
-      header: 'Add Exercise',
+      header: 'Add Set',
       inputs: [
-        {
-          name: 'name',
-          type: 'text',
-          placeholder: 'Exercise Name'
-        },
         {
           name: 'weight',
           type: 'number',
           placeholder: 'Weight (kg)'
         },
         {
-          name: 'sets',
-          type: 'number',
-          placeholder: 'Sets'
-        },
-        {
           name: 'reps',
           type: 'number',
-          placeholder: 'Reps'
+          placeholder: 'Number of reps'
+        },
+        {
+          name: 'restTime',
+          type: 'number',
+          placeholder: 'Rest time (seconds)',
+          value: exercise.restTimeSeconds || 60
         }
       ],
       buttons: [
@@ -185,20 +271,33 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         {
           text: 'Add',
           handler: (data) => {
-            const newExercise: Exercise = {
-              name: data.name,
-              weight: parseFloat(data.weight) || 0,
-              sets: parseInt(data.sets) || 0,
+            // Create new set with the embedded model approach
+            const newSet: ExerciseSet = {
+              exerciseId: exercise.exerciseId!,
+              orderPosition: (exercise.sets?.length || 0) + 1,
               reps: parseInt(data.reps) || 0,
-              workoutId: this.workout!.workoutId
+              weight: parseFloat(data.weight) || 0,
+              restTimeSeconds: parseInt(data.restTime) || 60,
+              type: SetType.NORMAL,
+              completed: false
             };
-
-            this.workoutService.addExerciseToWorkout(this.workout!.workoutId!, newExercise).subscribe({
-              next: (exercise) => {
-                this.exercises.push(exercise);
+            
+            // Update the exercise's restTimeSeconds for future sets
+            exercise.restTimeSeconds = newSet.restTimeSeconds;
+            
+            // Use activeWorkoutService to add set to exercise in active workout
+            this.activeWorkoutService.addSetToExercise(
+              this.workout!.workoutId!,
+              exercise.exerciseId!,
+              newSet
+            ).subscribe({
+              next: () => {
+                this.loadWorkoutExercises();
+                this.showToast('Set added');
               },
               error: (error) => {
-                console.error('Error adding exercise:', error);
+                this.showToast('Failed to add set');
+                console.error('Error adding set:', error);
               }
             });
           }
@@ -209,94 +308,91 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     await alert.present();
   }
 
-  startRestTimer(seconds = 60) {
-    this.restTimerActive = true;
-    this.restTimeRemaining = seconds;
-    this.restTimerSubscription = interval(1000).subscribe(() => {
-      this.restTimeRemaining--;
-      if (this.restTimeRemaining <= 0) {
-        this.stopRestTimer();
+  toggleSetComplete(exercise: Exercise, set: ExerciseSet) {
+    if (!exercise.exerciseId || !this.workout?.workoutId || !set.exerciseSetId) {
+      this.showToast('Cannot update set: Invalid set information');
+      return;
+    }
+
+    // Toggle the completed status locally
+    set.completed = !set.completed;
+
+    this.activeWorkoutService.updateSet(
+      this.workout.workoutId,
+      exercise.exerciseId,
+      set.exerciseSetId,
+      set
+    ).subscribe({
+      next: () => {
+        // No need to reload, we already updated locally
+      },
+      error: () => {
+        // Revert the change if the API call fails
+        set.completed = !set.completed;
+        this.showToast('Failed to update set');
       }
     });
   }
 
-  stopRestTimer() {
-    if (this.restTimerSubscription) {
-      this.restTimerSubscription.unsubscribe();
-    }
-    this.restTimerActive = false;
-  }
+  async deleteExercise(exercise: Exercise) {
+    if (!this.workout?.workoutId) return;
 
-  completeSet(exercise: Exercise) {
-    console.log('Completed set:', exercise);
-    this.startRestTimer();
-  }
-  
-  async presentExerciseOptions(exercise: Exercise, index: number) {
-    const actionSheet = await this.actionSheetController.create({
-      header: exercise.name,
+    const alert = await this.alertController.create({
+      header: 'Confirm Delete',
+      message: `Are you sure you want to remove ${exercise.name}?`,
       buttons: [
         {
-          text: 'Mark as Warmup',
-          icon: 'flame-outline',
-          handler: () => {
-            // Logic to mark as warmup
-          }
-        },
-        {
-          text: 'Mark as Drop Set',
-          icon: 'arrow-down-outline',
-          handler: () => {
-            // Logic to mark as drop set
-          }
+          text: 'Cancel',
+          role: 'cancel'
         },
         {
           text: 'Delete',
-          icon: 'trash-outline',
           role: 'destructive',
           handler: () => {
             if (exercise.exerciseId) {
-              this.workoutService.deleteExercise(exercise.exerciseId).subscribe({
+              this.activeWorkoutService.removeExerciseFromWorkout(
+                this.workout!.workoutId!,
+                exercise.exerciseId
+              ).subscribe({
                 next: () => {
-                  this.exercises.splice(index, 1);
+                  this.loadWorkoutExercises();
+                  this.showToast('Exercise removed');
                 },
                 error: (error) => {
-                  console.error('Error deleting exercise:', error);
+                  this.showToast('Failed to delete exercise');
                 }
               });
             }
           }
-        },
-        {
-          text: 'Cancel',
-          icon: 'close',
-          role: 'cancel'
         }
       ]
     });
-    await actionSheet.present();
+
+    await alert.present();
   }
-  
+
   async finishWorkout() {
     if (!this.workout?.workoutId) return;
-    
+
     const alert = await this.alertController.create({
       header: 'Finish Workout',
-      message: 'Are you sure you want to end this workout?',
+      message: 'Are you sure you want to finish this workout?',
       buttons: [
         {
           text: 'Cancel',
           role: 'cancel'
         },
         {
-          text: 'End Workout',
+          text: 'Finish',
           handler: () => {
-            this.workoutService.endWorkout(this.workout!.workoutId!).subscribe({
+            this.activeWorkoutService.finishWorkout(this.workout!.workoutId!).subscribe({
               next: () => {
-                this.router.navigate(['/tabs/workouts']);
+                this.stopWorkoutTimer();
+                this.router.navigate(['/workout-history']);
+                this.showToast('Workout completed!');
               },
               error: (error) => {
-                console.error('Error ending workout:', error);
+                this.showToast('Error finishing workout');
               }
             });
           }
@@ -306,8 +402,16 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
 
     await alert.present();
   }
-  
-  private isActiveWorkout(workout: Workout): workout is ActiveWorkout {
-    return 'startTime' in workout;
+
+  private async showToast(message: string) {
+    const toast = await this.toastController.create({
+      message,
+      duration: 2000,
+      position: 'bottom'
+    });
+    toast.present();
   }
+
 }
+
+

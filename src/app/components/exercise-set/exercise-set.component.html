@@ -1,0 +1,17 @@
+<div class="set-container" [class.completed]="completed">
+  <div class="set-field set-type">
+    <span>{{ displayLabel }}</span>
+  </div>
+  <div class="set-field set-weight">
+    <span>{{ weight }} kg</span>
+  </div>
+  <div class="set-field set-reps">
+    <span>{{ reps }} reps</span>
+  </div>
+  <div class="set-field set-status">
+    <ion-checkbox 
+      [checked]="completed" 
+      (ionChange)="toggleComplete()">
+    </ion-checkbox>
+  </div>
+</div>

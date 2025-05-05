@@ -1,13 +1,93 @@
-<ion-header [translucent]="true">
+<ion-header>
   <ion-toolbar>
-    <ion-title>active-workout</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/workout"></ion-back-button>
+    </ion-buttons>
+    <ion-title>
+      {{ workout?.name || 'Active Workout' }}
+    </ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="finishWorkout()" color="primary">
+        Finish
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">active-workout</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content>
+  <div *ngIf="workout">
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title class="ion-text-center">{{ formatTime(elapsedTime) }}</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="timer-controls">
+          <ion-button *ngIf="workoutActive" (click)="pauseWorkout()" color="warning">
+            <ion-icon name="pause"></ion-icon>
+            Pause
+          </ion-button>
+          <ion-button *ngIf="!workoutActive" (click)="resumeWorkout()" color="success">
+            <ion-icon name="play"></ion-icon>
+            Resume
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <div *ngIf="exercises.length > 0" class="exercise-list">
+      <ion-list>
+        <ion-item-group *ngFor="let exercise of exercises">
+          <ion-item-divider>
+            <ion-label>{{exercise.name}}</ion-label>
+            <ion-buttons slot="end" *ngIf="workoutActive">
+              <ion-button color="primary" (click)="addSet(exercise)">
+                <ion-icon name="add-circle-outline" slot="icon-only"></ion-icon>
+              </ion-button>
+              <ion-button color="danger" (click)="deleteExercise(exercise)">
+                <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-item-divider>
+          
+          <!-- Exercise Sets - Updated to work with embedded sets -->
+          <div *ngIf="exercise.sets && exercise.sets.length > 0">
+            <app-exercise-set 
+              *ngFor="let set of exercise.sets; let i = index"
+              [displayLabel]="set.type === SetType.NORMAL ? (i+1).toString() : 
+                             (set.type === SetType.WARMUP ? 'W' : 
+                             (set.type === SetType.DROPSET ? 'D' : 'F'))"
+              [weight]="set.weight || 0"
+              [reps]="set.reps || 0"
+              [completed]="set.completed || false"
+              (toggle)="toggleSetComplete(exercise, set)">
+            </app-exercise-set>
+          </div>
+          
+          <ion-item *ngIf="!exercise.sets?.length" lines="none">
+            <ion-label color="medium" class="ion-text-center">
+              No sets added. Tap + to add a set.
+            </ion-label>
+          </ion-item>
+        </ion-item-group>
+      </ion-list>
+    </div>
+
+    <div *ngIf="exercises.length === 0" class="ion-padding ion-text-center">
+      <p>No exercises added yet.</p>
+    </div>
+    
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button (click)="addExercise()">
+        <ion-icon name="add"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  </div>
+
+  <div *ngIf="!workout" class="ion-padding ion-text-center">
+    <h2>No active workout</h2>
+    <p>Start a new workout from the workout tab.</p>
+    <ion-button routerLink="/tabs/workout" expand="block">
+      Go to Workouts
+    </ion-button>
+  </div>
 </ion-content>
