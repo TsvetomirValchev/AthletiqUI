@@ -1,12 +1,14 @@
 import { Component, OnInit } from '@angular/core';
-import { WorkoutService } from '../services/workout.service';
-import { Workout } from '../models/workout.model';
+import { WorkoutService } from '../../services/workout.service';
+import { Workout } from '../../models/workout.model';
+import { ActiveWorkout } from '../../models/active-workout.model'; // Add this import
 import { IonicModule, AlertController, ActionSheetController, ToastController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
-import { Exercise } from '../models/exercise.model';
+import { Exercise } from '../../models/exercise.model';
 import { catchError, finalize } from 'rxjs/operators';
 import { forkJoin, of } from 'rxjs';
+import { ActiveWorkoutService } from '../../services/active-workout.service'; // Add this import
 
 @Component({
   selector: 'app-workout',
@@ -25,6 +27,7 @@ export class WorkoutPage implements OnInit {
 
   constructor(
     private workoutService: WorkoutService,
+    private activeWorkoutService: ActiveWorkoutService, // Add this service
     private router: Router,
     private alertController: AlertController,
     private actionSheetController: ActionSheetController,
@@ -144,29 +147,12 @@ export class WorkoutPage implements OnInit {
   startWorkout(workout: Workout) {
     if (!workout.workoutId) return;
 
-    // Make sure to load the complete workout with all details
     this.isLoading = true;
+    console.log('Starting workout:', workout.workoutId);
     
-    this.workoutService.getById(workout.workoutId).subscribe({
-      next: (completeWorkout: Workout) => {
-        this.workoutService.startWorkout(completeWorkout).subscribe({
-          next: (activeWorkout: any) => {
-            this.isLoading = false;
-            this.router.navigate(['/active-workout', activeWorkout.workoutId]);
-          },
-          error: (error: Error) => {
-            this.isLoading = false;
-            console.error('Error starting workout:', error);
-            this.showToast('Failed to start workout');
-          }
-        });
-      },
-      error: (error: Error) => {
-        this.isLoading = false;
-        console.error('Error loading complete workout:', error);
-        this.showToast('Failed to load workout details');
-      }
-    });
+    // Navigate directly to active workout with the ID
+    this.router.navigate(['/active-workout', workout.workoutId]);
+    this.isLoading = false;
   }
 
   async deleteWorkout(workout: Workout) {

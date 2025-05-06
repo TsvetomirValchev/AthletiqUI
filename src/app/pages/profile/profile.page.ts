@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { AuthService } from '../services/auth.service';
-import { WorkoutService } from '../services/workout.service';
+import { AuthService } from '../../services/auth.service';
+import { WorkoutService } from '../../services/workout.service';
 import { IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';

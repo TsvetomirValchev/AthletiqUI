@@ -3,8 +3,8 @@ import { IonicModule, AlertController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ExerciseTemplate } from '../models/exercise-template.model';
-import { ExerciseTemplateService } from '../services/exercise-template.service';
+import { ExerciseTemplate } from '../../models/exercise-template.model';
+import { ExerciseTemplateService } from '../../services/exercise-template.service';
 
 @Component({
   selector: 'app-browse-exercises',

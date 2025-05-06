@@ -4,12 +4,12 @@ import { IonicModule, AlertController, ToastController, ActionSheetController, I
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { WorkoutService } from '../services/workout.service';
-import { Workout } from '../models/workout.model';
-import { Exercise } from '../models/exercise.model';
-import { ExerciseTemplate } from '../models/exercise-template.model';
-import { SetType } from '../models/set-type.enum';
-import { ExerciseSet } from '../models/exercise-set.model';
+import { WorkoutService } from '../../services/workout.service';
+import { Workout } from '../../models/workout.model';
+import { Exercise } from '../../models/exercise.model';
+import { ExerciseTemplate } from '../../models/exercise-template.model';
+import { SetType } from '../../models/set-type.enum';
+import { ExerciseSet } from '../../models/exercise-set.model';
 import { catchError, forkJoin, of } from 'rxjs';
 
 @Component({
