@@ -1,32 +1,358 @@
-.profile-avatar {
-  width: 100px;
-  height: 100px;
-  margin: 0 auto 16px;
-}
+// Profile Page Styling
 
-.profile-name {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.profile-email {
-  color: var(--ion-color-medium);
-  margin-top: 4px;
-}
-
-.stats-grid {
-  margin-top: 24px;
+// User profile header
+.user-profile-header {
+  padding: 24px 16px;
   text-align: center;
+  background: linear-gradient(to bottom, var(--ion-color-primary), var(--ion-color-primary-shade));
+  color: white;
+  border-radius: 0 0 16px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 16px;
+  }
 }
 
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--ion-color-primary);
+// Profile stats display
+.profile-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 16px;
 }
 
-.stat-label {
-  font-size: 14px;
+.profile-stat-item {
+  text-align: center;
+  
+  .stat-value {
+    font-size: 24px;
+    font-weight: bold;
+  }
+  
+  .stat-label {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+}
+
+// Workout history container
+.workout-history-container {
+  padding: 0 16px 24px;
+  
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 24px 0 16px;
+    padding-left: 4px;
+  }
+}
+
+.workout-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// Workout cards
+.workout-card {
+  margin: 0 0 16px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  ion-card-header {
+    padding: 16px;
+    cursor: pointer;
+  }
+  
+  ion-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 4px 0 0;
+  }
+  
+  ion-card-subtitle {
+    color: var(--ion-color-medium);
+    font-size: 14px;
+  }
+}
+
+// Workout header content
+.workout-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.workout-header-info {
+  flex: 1;
+}
+
+.workout-header-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  ion-icon {
+    font-size: 20px;
+    color: var(--ion-color-medium);
+    transition: transform 0.3s ease;
+  }
+}
+
+// Stats summary
+.stats-summary {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ion-color-light);
+  margin-bottom: 16px;
+  
+  .stat-item {
+    text-align: center;
+    
+    .stat-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--ion-color-primary);
+    }
+    
+    .stat-label {
+      font-size: 14px;
+      color: var(--ion-color-medium);
+    }
+  }
+}
+
+// Exercise items
+.exercises-list {
+  margin-top: 16px;
+}
+
+.exercise-item {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: var(--ion-color-light);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.exercise-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  cursor: pointer;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+}
+
+.exercise-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sets-count {
   color: var(--ion-color-medium);
+  font-size: 14px;
+}
+
+.toggle-sets-icon {
+  font-size: 18px;
+  color: var(--ion-color-medium);
+}
+
+// Sets table
+.sets-table {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.05); // Darker background
+  margin-top: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sets-header {
+  display: grid;
+  grid-template-columns: 1fr 2fr 2fr 1fr;
+  background-color: rgba(0, 0, 0, 0.1); // Even darker header
+  padding: 12px 0;
+  font-weight: 500;
+  font-size: 14px;
+  text-align: center;
+  color: var(--ion-color-medium);
+}
+
+.set-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 2fr 1fr;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 12px 0;
+  text-align: center;
+
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &:hover {
+    background-color: rgba(var(--ion-color-primary-rgb), 0.05); // Highlight on hover with primary color
+  }
+}
+
+.set-cell, .weight-cell, .reps-cell, .status-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+// Status styling
+.status-cell {
+  ion-icon {
+    font-size: 18px;
+    
+    &[name="checkmark-circle"] {
+      color: var(--ion-color-success);
+    }
+    
+    &[name="close-circle"] {
+      color: var(--ion-color-danger);
+    }
+  }
+}
+
+// Empty states and loading
+.no-exercises, .no-sets {
+  text-align: center;
+  padding: 16px;
+  color: var(--ion-color-medium);
+  font-size: 14px;
+}
+
+.no-workouts {
+  text-align: center;
+  padding: 40px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  
+  ion-icon {
+    font-size: 64px;
+    color: var(--ion-color-medium);
+    margin-bottom: 16px;
+  }
+  
+  h3 {
+    margin: 0 0 8px;
+    font-size: 20px;
+  }
+  
+  p {
+    margin: 0 0 24px;
+    color: var(--ion-color-medium);
+  }
+  
+  .start-workout-btn {
+    max-width: 200px;
+    margin: 8px auto 0;
+  }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 16px;
+  text-align: center;
+  
+  ion-spinner {
+    margin-bottom: 16px;
+  }
+}
+
+.details-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  
+  ion-spinner {
+    margin-bottom: 12px;
+  }
+}
+
+// Animation styles
+.rotate-icon {
+  transform: rotate(180deg);
+}
+
+ion-card-header.expanded {
+  background-color: rgba(var(--ion-color-primary-rgb), 0.05);
+}
+
+// Exercise title with image
+.exercise-title-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.exercise-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+// Set type styling
+.warmup-type {
+  .set-cell {
+    color: #ffa726; // Orange for warmup
+    font-weight: bold;
+  }
+  background-color: rgba(255, 167, 38, 0.1);
+}
+
+.dropset-type {
+  .set-cell {
+    color: #7e57c2; // Purple for dropset
+    font-weight: bold;
+  }
+  background-color: rgba(126, 87, 194, 0.1);
+}
+
+.failure-type {
+  .set-cell {
+    color: #ef5350; // Red for failure
+    font-weight: bold;
+  }
+  background-color: rgba(239, 83, 80, 0.1);
 }

@@ -107,8 +107,8 @@
                       [(ngModel)]="set.weight" 
                       [ngModelOptions]="{standalone: true}"
                       min="0" 
-                      inputmode="numeric"
-                      pattern="[0-9]*"
+                      inputmode="decimal"
+                      min="0"
                       placeholder="0"
                       class="kg-input"
                       (ionChange)="enforceMinimumValue(set, 'weight', 0)">
@@ -122,7 +122,7 @@
                       [ngModelOptions]="{standalone: true}"
                       min="0" 
                       inputmode="numeric"
-                      pattern="[0-9]*"
+                      min="0"
                       placeholder="0"
                       class="reps-input"
                       (ionChange)="enforceMinimumValue(set, 'reps', 0)">
@@ -167,10 +167,14 @@
       <ion-icon name="barbell-outline"></ion-icon>
       <div class="empty-title">No Exercises Added</div>
       <div class="empty-subtitle">Start building your routine by adding exercises</div>
-      <ion-button class="add-first-exercise-btn" expand="block" (click)="toggleLibrary(true)">
-        <ion-icon name="add" slot="start"></ion-icon>
-        Add Exercise
-      </ion-button>
+      <button class="add-first-exercise-btn" (click)="toggleLibrary(true)">
+        <ion-icon name="add"></ion-icon>
+        ADD EXERCISE
+      </button>
+      <button class="discard-routine-btn" (click)="discardCreation()">
+        <ion-icon name="close-outline"></ion-icon>
+        DISCARD
+      </button>
     </div>
 
     <!-- Replace the library container section with this improved version -->

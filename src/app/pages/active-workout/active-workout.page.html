@@ -6,6 +6,7 @@
     <ion-title>
       {{ workout?.name || 'Active Workout' }}
     </ion-title>
+    <div class="timer-display-header">{{ formatTime(elapsedTime) }}</div>
     <ion-buttons slot="end">
       <ion-button (click)="finishWorkout()">
         <ion-icon name="checkmark-done-outline" slot="icon-only"></ion-icon>
@@ -14,10 +15,9 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <!-- Timer Display -->
-  <div class="timer-container">
-    <div class="timer-display">{{ formatTime(elapsedTime) }}</div>
+<ion-content class="create-routine-page">
+  <!-- Timer Controls -->
+  <div class="timer-controls-container">
     <div class="timer-controls">
       <ion-button *ngIf="workoutActive" (click)="pauseWorkout()" color="warning" class="pause-button">
         PAUSE
@@ -34,90 +34,164 @@
     <p>Loading workout...</p>
   </div>
 
-  <!-- Exercise List -->
-  <div *ngIf="!isLoading">
-    <!-- Empty state when no exercises -->
-    <div *ngIf="exercises.length === 0" class="empty-state-container">
-      <ion-icon name="barbell-outline"></ion-icon>
-      <div class="empty-title">No Exercises Added</div>
-      <div class="empty-subtitle">Add exercises to track your workout</div>
-      <button class="add-first-exercise-btn" (click)="addExercise()">
-        <ion-icon name="add"></ion-icon>
-        Add First Exercise
-      </button>
-    </div>
-
-    <!-- Exercise Cards -->
-    <div *ngFor="let exercise of exercises" class="exercise-card">
-      <div class="exercise-header">
-        <div class="exercise-avatar">
-          <img src="assets/exercise-icons/barbell.png" alt="Exercise">
-        </div>
-        <div class="exercise-title">{{ exercise.name }}</div>
-        <div class="exercise-options">
-          <ion-button fill="clear" (click)="addSet(exercise)">
-            <ion-icon name="add-outline"></ion-icon>
-          </ion-button>
-        </div>
+  <!-- Main container -->
+  <div class="main-container" *ngIf="!isLoading">
+    <div class="routine-container" [class.empty-routine]="exercises.length === 0">
+      <!-- Empty state - only show when there are no exercises -->
+      <div class="empty-state-container" *ngIf="exercises.length === 0">
+        <ion-icon name="barbell-outline"></ion-icon>
+        <div class="empty-title">No Exercises Added</div>
+        <div class="empty-subtitle">Add exercises to track your workout</div>
+        <ion-button class="add-first-exercise-btn" expand="block" (click)="addExercise()">
+          <ion-icon name="add" slot="start"></ion-icon>
+          Add First Exercise
+        </ion-button>
+<ion-button (click)="startEmptyWorkout()">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Start Empty Workout
+        </ion-button>
+        <ion-button (click)="startEmptyWorkout()">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Start Empty Workout
+        </ion-button>
       </div>
 
-      <!-- Note Section -->
-      <div class="notes-section">
-        <div class="section-label">Note</div>
-        <textarea [(ngModel)]="exercise.notes" placeholder="Add pinned note" class="note-input"></textarea>
-      </div>
-
-      <!-- Rest Timer -->
-      <div class="timer-section">
-        <div class="section-label">Rest Timer: {{ getRestTimeDisplay(exercise.restTimeSeconds || 0) }}</div>
-      </div>
-
-      <!-- Sets Section -->
-      <div class="sets-section">
-        <div class="sets-header">
-          <div class="set-col">SET</div>
-          <div class="prev-col">PREVIOUS</div>
-          <div class="kg-col">KG</div>
-          <div class="reps-col">REPS</div>
-          <div class="done-col"></div>
+      <!-- Exercise Cards -->
+      <div *ngFor="let exercise of exercises; let exerciseIndex = index" class="exercise-card">
+        <div class="exercise-header">
+          <div class="exercise-avatar">
+            <img src="assets/exercise-icons/barbell.png" alt="Exercise">
+          </div>
+          <div class="exercise-title">{{ exercise.name }}</div>
+          <div class="exercise-options">
+            <ion-button fill="clear">
+              <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+            </ion-button>
+          </div>
         </div>
-        
-        <div *ngFor="let set of exercise.sets; let setIndex = index" class="set-row" [class.completed-set]="set.completed">
-          <div class="set-col">
-            <div [class]="'set-type ' + getSetTypeClass(set.type)">
-              {{ getSetDisplay(set, exercise.sets || [], setIndex) }}
+
+        <!-- Note Section -->
+        <div class="notes-section">
+          <div class="section-label">Note</div>
+          <textarea [(ngModel)]="exercise.notes" placeholder="Add pinned note" class="note-input"></textarea>
+        </div>
+
+        <!-- Rest Timer -->
+        <div class="timer-section">
+          <div class="section-label">Rest Timer:</div>
+          <ion-select 
+            [(ngModel)]="exercise.restTimeSeconds" 
+            [ngModelOptions]="{standalone: true}" 
+            interface="popover" 
+            [selectedText]="getRestTimeDisplay(exercise.restTimeSeconds || 0)">
+            <ion-select-option value="0">Off</ion-select-option>
+            <ion-select-option value="15">15s</ion-select-option>
+            <ion-select-option value="30">30s</ion-select-option>
+            <ion-select-option value="45">45s</ion-select-option>
+            <ion-select-option value="60">1m</ion-select-option>
+            <ion-select-option value="75">1m 15s</ion-select-option>
+            <ion-select-option value="90">1m 30s</ion-select-option>
+            <ion-select-option value="105">1m 45s</ion-select-option>
+            <ion-select-option value="120">2m</ion-select-option>
+            <ion-select-option value="135">2m 15s</ion-select-option>
+            <ion-select-option value="150">2m 30s</ion-select-option>
+            <ion-select-option value="165">2m 45s</ion-select-option>
+            <ion-select-option value="180">3m</ion-select-option>
+            <ion-select-option value="195">3m 15s</ion-select-option>
+            <ion-select-option value="210">3m 30s</ion-select-option>
+            <ion-select-option value="225">3m 45s</ion-select-option>
+            <ion-select-option value="240">4m</ion-select-option>
+            <ion-select-option value="255">4m 15s</ion-select-option>
+            <ion-select-option value="270">4m 30s</ion-select-option>
+            <ion-select-option value="285">4m 45s</ion-select-option>
+            <ion-select-option value="300">5m</ion-select-option>
+          </ion-select>
+        </div>
+
+
+        <!-- Sets Section -->
+        <div class="sets-section">
+          <div class="sets-header">
+            <div class="set-col">SET</div>
+            <div class="kg-col">KG</div>
+            <div class="reps-col">REPS</div>
+            <div class="completed-col">DONE</div>
+          </div>
+            
+          <!-- Exercise Sets -->
+          <div *ngFor="let set of exercise.sets; let setIndex = index" class="set-row">
+            <div class="set-col">
+              <ion-select [(ngModel)]="set.type" 
+                [ngModelOptions]="{standalone: true}" 
+                [ngClass]="{
+                  'set-type-select': true,
+                  'warmup-type': set.type === SetType.WARMUP,
+                  'dropset-type': set.type === SetType.DROPSET,
+                  'failure-type': set.type === SetType.FAILURE,
+                  'normal-type': set.type === SetType.NORMAL
+                }"
+                interface="popover"
+                (ionChange)="onSetTypeChange(exercise.sets, setIndex)">
+                <ion-select-option [value]="SetType.NORMAL">{{ getNormalSetNumber(exercise.sets, setIndex) }}</ion-select-option>
+                <ion-select-option [value]="SetType.WARMUP">W</ion-select-option>
+                <ion-select-option [value]="SetType.DROPSET">D</ion-select-option>
+                <ion-select-option [value]="SetType.FAILURE">F</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="kg-col">
+              <ion-item class="input-item">
+                <ion-input
+                  type="number"
+                  [(ngModel)]="set.weight"
+                  inputmode="decimal"
+                  min="0"
+                  placeholder="0">
+                </ion-input>
+              </ion-item>
+            </div>
+            <div class="reps-col">
+              <ion-item class="input-item">
+                <ion-input
+                  type="number"
+                  [(ngModel)]="set.reps"
+                  inputmode="numeric"
+                  min="0"
+                  placeholder="0">
+                </ion-input>
+              </ion-item>
+            </div>
+            <div class="completed-col">
+              <ion-checkbox class="set-completion-checkbox" [(ngModel)]="set.completed"></ion-checkbox>
             </div>
           </div>
-          <div class="prev-col">
-            {{ getPreviousSetDisplay(exercise, setIndex) }}
-          </div>
-          <div class="kg-col">
-            <span class="weight-value">{{ set.weight || 0 }}</span>
-          </div>
-          <div class="reps-col">
-            <span class="reps-value">{{ set.reps || 0 }}</span>
-          </div>
-          <div class="done-col">
-            <div class="completion-indicator" (click)="toggleSetComplete(exercise, set)">
-              <ion-icon [name]="set.completed ? 'checkmark-circle' : 'ellipse-outline'" 
-                [class.completed]="set.completed"></ion-icon>
-            </div>
-          </div>
+          
+          <!-- Add Set Button -->
+          <button class="add-set-button" (click)="addSet(exercise)">
+            <ion-icon name="add-circle-outline"></ion-icon>
+            Add Set
+          </button>
         </div>
-        
-        <!-- Add Set Button -->
-        <button class="add-set-button" (click)="addSet(exercise)">
-          <ion-icon name="add"></ion-icon> Add set
-        </button>
       </div>
-    </div>
 
-    <!-- Add Exercise Button -->
-    <div class="add-exercise-button-container" *ngIf="exercises.length > 0">
-      <button class="add-exercise-button" (click)="addExercise()">
-        <ion-icon name="add-outline"></ion-icon>
-        Add Exercise
-      </button>
+      <!-- Action Buttons -->
+      <div *ngIf="exercises.length > 0">
+        <div class="add-exercise-button-container">
+          <button class="add-exercise-button" (click)="addExercise()">
+            <ion-icon name="add-circle-outline"></ion-icon>
+            Add Exercise
+          </button>
+        </div>
+        <div class="routine-action-buttons">
+          <button class="discard-button" (click)="discardWorkout()">
+            <ion-icon name="trash-outline"></ion-icon>
+            Discard
+          </button>
+          <button class="save-button" (click)="finishWorkout()">
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
+            Complete Workout
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </ion-content>

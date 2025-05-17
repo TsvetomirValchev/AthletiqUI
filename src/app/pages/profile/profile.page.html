@@ -1,82 +1,145 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Profile</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/settings">
-        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
+    <ion-title>{{ username }}'s Profile</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-card>
-    <ion-card-content class="ion-text-center">
-      <ion-avatar class="profile-avatar">
-        <img alt="Profile Picture" src="assets/avatar.png" />
-      </ion-avatar>
-      <h2 class="profile-name">{{ userData?.username || 'User' }}</h2>
-      <p class="profile-email">{{ userData?.email || 'user@example.com' }}</p>
-      
-      <ion-grid class="stats-grid">
-        <ion-row>
-          <ion-col>
-            <div class="stat-value">{{ workoutCount || 0 }}</div>
-            <div class="stat-label">Workouts</div>
-          </ion-col>
-          <ion-col>
-            <div class="stat-value">{{ totalHours || 0 }}</div>
-            <div class="stat-label">Hours</div>
-          </ion-col>
-          <ion-col>
-            <div class="stat-value">{{ daysActive || 0 }}</div>
-            <div class="stat-label">Days Active</div>
-          </ion-col>
-        </ion-row>
-      </ion-grid>
-    </ion-card-content>
-  </ion-card>
+  <!-- Debug Info -->
+  <div *ngIf="showDebug" style="background: #333; color: #fff; padding: 10px; margin: 10px; font-size: 12px;">
+    <h4>Debug Info</h4>
+    <pre>{{ workoutHistory | json }}</pre>
+  </div>
 
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Achievements</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <ion-list>
-        <ion-item *ngFor="let achievement of achievements">
-          <ion-icon [name]="achievement.icon" slot="start" [color]="achievement.unlocked ? 'primary' : 'medium'"></ion-icon>
-          <ion-label>
-            <h3>{{ achievement.name }}</h3>
-            <p>{{ achievement.description }}</p>
-          </ion-label>
-          <ion-badge slot="end" *ngIf="achievement.unlocked">✓</ion-badge>
-        </ion-item>
-        
-        <ion-item *ngIf="achievements.length === 0">
-          <ion-label color="medium">Complete workouts to unlock achievements</ion-label>
-        </ion-item>
-      </ion-list>
-    </ion-card-content>
-  </ion-card>
+  <!-- User Profile Stats -->
+  <div class="user-profile-header">
+    <h1>{{ username }}</h1>
+    <div class="profile-stats">
+      <div class="profile-stat-item">
+        <div class="stat-value">{{ totalWorkouts }}</div>
+        <div class="stat-label">Workouts</div>
+      </div>
+      <div class="profile-stat-item">
+        <div class="stat-value">{{ hoursActive }}</div>
+        <div class="stat-label">Hours</div>
+      </div>
+      <div class="profile-stat-item">
+        <div class="stat-value">{{ daysActive }}</div>
+        <div class="stat-label">Days</div>
+      </div>
+    </div>
+  </div>
 
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Personal Records</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <ion-list>
-        <ion-item *ngFor="let record of personalRecords">
-          <ion-label>
-            <h3>{{ record.exercise }}</h3>
-            <p>{{ record.weight }} kg × {{ record.reps }}</p>
-          </ion-label>
-          <ion-note slot="end" color="primary">{{ record.date | date:'MMM d' }}</ion-note>
-        </ion-item>
+  <div class="workout-history-container">
+    <h2>Workout History</h2>
+    
+    <!-- Workout History Cards -->
+    <div *ngIf="!isLoading && workoutHistory && workoutHistory.length > 0" class="workout-history-list">
+      <ion-card *ngFor="let workout of workoutHistory; let i = index" class="workout-card">        <!-- Clickable Header - Toggles Exercise Details -->
+        <ion-card-header (click)="toggleWorkoutDetailsByIndex(i, workout.workoutHistoryId)" [ngClass]="{'expanded': expandedWorkoutIndex === i}">
+          <div class="workout-header-content">
+            <div class="workout-header-info">
+              <ion-card-subtitle>
+                {{ workout.date | date:'MMM d, y' }} • {{ formatDuration(workout.duration) }}
+              </ion-card-subtitle>
+              <ion-card-title>{{ workout.name || 'Workout' }}</ion-card-title>
+            </div>
+            <div class="workout-header-toggle">
+              <ion-icon [name]="expandedWorkoutIndex === i ? 'chevron-up' : 'chevron-down'" 
+                        [class.rotate-icon]="expandedWorkoutIndex === i"></ion-icon>
+            </div>
+          </div>
+        </ion-card-header>
         
-        <ion-item *ngIf="personalRecords.length === 0">
-          <ion-label color="medium">Complete workouts to set personal records</ion-label>
-        </ion-item>
-      </ion-list>
-    </ion-card-content>
-  </ion-card>
+        <!-- Workout Statistics Summary - Always Visible -->
+        <ion-card-content>
+          <!-- Workout stats summary -->
+          <div class="stats-summary">
+            <div class="stat-item">
+              <div class="stat-value">{{ workout.exerciseHistories?.length || 0 }}</div>
+              <div class="stat-label">Exercises</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ calculateTotalSets(workout) }}</div>
+              <div class="stat-label">Sets</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ calculateTotalVolume(workout) }}</div>
+              <div class="stat-label">Volume</div>
+            </div>
+          </div>
+          
+          <!-- Detailed Exercise List - Visible only when expanded -->
+          <div *ngIf="expandedWorkoutIndex === i" class="exercises-list">
+            <!-- Loading indicator while fetching details -->
+            <div *ngIf="loadingDetails" class="details-loading">
+              <ion-spinner name="crescent"></ion-spinner>
+              <p>Loading details...</p>
+            </div>
+            
+            <!-- No exercises message -->
+            <div *ngIf="!loadingDetails && (!workout.exerciseHistories || workout.exerciseHistories.length === 0)" class="no-exercises">
+              <p>No exercises found for this workout</p>
+            </div>
+            
+            <!-- Exercise items with collapsible sets -->
+            <div *ngFor="let exercise of workout.exerciseHistories; let e = index" class="exercise-item">              <!-- Exercise header - clickable to toggle set visibility -->              <div class="exercise-header" (click)="toggleExerciseSets(exercise)">
+                <div class="exercise-title-container">
+                  <div class="exercise-avatar">
+                    <img [src]="getExerciseImage(exercise.exerciseName)" 
+                         alt="{{ exercise.exerciseName }}" 
+                         (error)="handleImageError($event)">
+                  </div>
+                  <h3>{{ exercise.exerciseName }}</h3>
+                </div>
+                <div class="exercise-header-right">
+                  <span class="sets-count">{{ exercise.exerciseSetHistories?.length || 0 }} sets</span>
+                  <ion-icon [name]="exerciseVisibilityMap.get(getExerciseKey(exercise)) ? 'chevron-up' : 'chevron-down'" class="toggle-sets-icon"></ion-icon>
+                </div>
+              </div>              <!-- Sets table - collapsible -->
+              <div class="sets-table" *ngIf="exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0">
+                <!-- Header row -->
+                <div class="sets-header">
+                  <div class="set-cell">Set</div>
+                  <div class="weight-cell">Weight</div>
+                  <div class="reps-cell">Reps</div>
+                  <div class="status-cell">Status</div>
+                </div>
+                
+                <!-- Set rows -->
+                <div *ngFor="let set of exercise.exerciseSetHistories" class="set-row" 
+                     [ngClass]="getSetTypeClass(set.type)">
+                  <div class="set-cell">{{ getSetDisplay(set) }}</div>
+                  <div class="weight-cell">{{ set.weight || 0 }} kg</div>
+                  <div class="reps-cell">{{ set.reps || 0 }}</div>
+                  <div class="status-cell">
+                    <ion-icon [name]="set.completed ? 'checkmark-circle' : 'close-circle'" 
+                              [color]="set.completed ? 'success' : 'medium'"></ion-icon>
+                  </div>
+                </div>
+              </div>
+                <!-- Show message if no sets -->              <div *ngIf="exerciseVisibilityMap.get(getExerciseKey(exercise)) && (!exercise.exerciseSetHistories || exercise.exerciseSetHistories.length === 0)" class="no-sets">
+                <p>No sets found for this exercise</p>
+                <p *ngIf="showDebug" class="debug-info">Debug: Exercise ID = {{ exercise.exerciseHistoryId || 'None' }}</p>
+              </div>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <!-- Loading indicator -->
+    <div *ngIf="isLoading" class="loading-container">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Loading workout history...</p>
+    </div>    <!-- No workouts message -->
+    <div *ngIf="!isLoading && (!workoutHistory || workoutHistory.length === 0)" class="no-workouts">
+      <ion-icon name="fitness-outline" size="large"></ion-icon>
+      <h3>No Workout History</h3>
+      <p>Complete a workout to see your history here</p>
+      <ion-button expand="block" routerLink="/tabs/workout" class="start-workout-btn">
+        Start a Workout
+      </ion-button>
+    </div>
+  </div>
 </ion-content>

@@ -82,27 +82,8 @@ export class WorkoutPage implements OnInit {
   }
 
   startEmptyWorkout() {
-    const newWorkout: Workout = {
-      name: `Workout ${new Date().toLocaleDateString()}`,
-    };
-
-    this.workoutService.createWorkout(newWorkout).subscribe({
-      next: (createdWorkout: Workout) => {
-        this.workoutService.startWorkout(createdWorkout).subscribe({
-          next: (activeWorkout: any) => {
-            this.router.navigate(['/active-workout', activeWorkout.workoutId]);
-          },
-          error: (error: Error) => {
-            console.error('Error starting workout:', error);
-            this.showToast('Failed to start workout');
-          }
-        });
-      },
-      error: (error: Error) => {
-        console.error('Error creating workout:', error);
-        this.showToast('Failed to create workout');
-      }
-    });
+    // Navigate directly to the empty workout route
+    this.router.navigate(['/active-workout/empty']);
   }
 
   async presentOptions(workout: Workout) {

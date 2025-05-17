@@ -154,17 +154,40 @@ export class ActiveWorkoutService {
       return throwError(() => new Error('No active workout'));
     }
     
-    // Stop the timer
     this.stopTimer();
     
-    // For frontend-only approach, just clean up the session
+    // Get elapsed time in seconds from the session
+    const elapsedTimeSeconds = currentSession.elapsedTimeSeconds;
+    
+    // Convert to ISO 8601 duration format (PT[hours]H[minutes]M[seconds]S)
+    const hours = Math.floor(elapsedTimeSeconds / 3600);
+    const minutes = Math.floor((elapsedTimeSeconds % 3600) / 60);
+    const seconds = elapsedTimeSeconds % 60;
+    
+    // Build ISO 8601 duration string
+    let duration = 'PT';
+    if (hours > 0) duration += `${hours}H`;
+    if (minutes > 0) duration += `${minutes}M`;
+    if (seconds > 0 || (hours === 0 && minutes === 0)) duration += `${seconds}S`;
+    
     const finishedWorkout: ActiveWorkout = {
       ...currentSession.workout,
+      workoutId: currentSession.workout.workoutId, // Explicitly ensure workoutId is included
       startTime: currentSession.startTime,
-      endTime: new Date().toISOString()
+      endTime: new Date().toISOString(),
+      duration: duration
     };
     
+    console.log(`Workout finished with duration: ${duration} (${elapsedTimeSeconds} seconds)`);
+    console.log('Finished workout object with workoutId:', finishedWorkout.workoutId);
+    
+    // Get the current state of exercises with any local changes applied
+    const exercises = this.applyLocalChangesToExercises(currentSession.exercises);
+    
+    // Clear the current session
     this.currentSessionSubject.next(null);
+    
+    // Return the finished workout without saving to backend
     return of(finishedWorkout);
   }
 

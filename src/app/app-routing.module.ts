@@ -25,9 +25,13 @@ const routes: Routes = [
     canActivate: [authGuard]
   },
   {
-    path: 'active-workout',
+    path: 'active-workout/empty',
     loadComponent: () => import('./pages/active-workout/active-workout.page').then(m => m.ActiveWorkoutPage),
     canActivate: [authGuard]
+  },
+  {
+    path: 'active-workout',
+    loadChildren: () => import('./pages/active-workout/active-workout.module').then(m => m.ActiveWorkoutPageModule)
   },
   {
     path: 'settings',
@@ -43,10 +47,6 @@ const routes: Routes = [
     path: 'browse-exercises',
     loadComponent: () => import('./pages/browse-exercises/browse-exercises.page').then(m => m.BrowseExercisesPage),
     canActivate: [authGuard]
-  },
-  {
-    path: 'workout-history',
-    loadChildren: () => import('./pages/workout-history/workout-history.module').then( m => m.WorkoutHistoryPageModule)
   },
   {
     path: 'exercise-templates',

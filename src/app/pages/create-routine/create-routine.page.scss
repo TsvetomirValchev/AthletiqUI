@@ -19,6 +19,7 @@
     flex: 3;
     overflow-y: auto;
     padding: 0 16px 20px;
+    padding-bottom: 80px; // Add more padding at the bottom
 
     // On desktop, show border
     @media (min-width: 769px) {
@@ -276,6 +277,31 @@ ion-reorder-group .reorder-selected {
     align-items: center;
     justify-content: center;
     padding: 0 4px;
+
+    ion-input {
+    --background: #1e1e1e;
+    --color: white;
+    --padding-start: 8px;
+    --padding-end: 8px;
+    --placeholder-color: #666;
+    --placeholder-opacity: 1;
+    text-align: center;
+    min-height: 36px;
+    font-size: 16px;
+    margin: 0;
+
+    // No borders on small screens (phones)
+    @media (max-width: 768px) {
+      --border-width: 0;
+      border: none;
+    }
+
+    // Show borders on larger screens (PCs)
+    @media (min-width: 769px) {
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+  }
 }
 
 // Column for remove button
@@ -335,7 +361,7 @@ ion-reorder-group .reorder-selected {
     }
 }
 
-// Fix ion-item styling for inputs
+//Fix ion-item styling for inputs
 .input-item {
     --background: transparent;
     --padding-start: 0;
@@ -609,21 +635,62 @@ ion-input {
     .empty-subtitle {
         font-size: 14px;
         margin-bottom: 24px;
-    }
-  
+    }     
+    
+    // Style for the add-exercise-button in empty state
     .add-first-exercise-btn {
-        --background: #007bff;
-        --background-activated: #0069d9;
-        --border-radius: 24px;
-        --padding-start: 20px;
-        --padding-end: 20px;
-        height: 48px;
+        background-color: #0078ff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 24px;
+        font-size: 16px;
         font-weight: 500;
-        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 250px;
+        cursor: pointer;
+        margin-bottom: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         
-        // Show only on mobile
+        ion-icon {
+            margin-right: 8px;
+            font-size: 20px;
+            color: white;
+            margin-bottom: 0;
+        }
+
         @media (min-width: 769px) {
             display: none;
+        }
+    }
+    
+    // Style for the discard routine button in empty state
+    .discard-routine-btn {
+        background-color: #ff3b30;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 20px;
+        font-size: 16px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 250px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        
+        ion-icon {
+            margin-right: 8px;
+            font-size: 20px;
+            color: white;
+            margin-bottom: 0;
         }
     }
 }
@@ -693,6 +760,10 @@ ion-input {
     ion-icon {
         margin-right: 8px;
         font-size: 20px;
+    }
+
+    @media (min-width: 769px) {
+        display: none;
     }
 }
 
@@ -788,6 +859,69 @@ ion-toast {
     
     &:hover {
       background-color: #0069d9;
+    }
+    
+    &:disabled {
+      background-color: #cccccc;
+      color: #666666;
+      cursor: not-allowed;
+    }
+  }
+  
+  .discard-button {
+    background-color: transparent;
+    color: #ff3b30;
+    border: 1px solid #ff3b30;
+    
+    &:hover {
+      background-color: rgba(255, 59, 48, 0.1);
+    }
+  }
+}
+
+// Add styles for the new vertical action button container
+.action-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0;
+  width: 100%;
+  
+  button {
+    padding: 12px 16px;
+    font-size: 16px;
+    font-weight: 500;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    width: 100%;
+    
+    ion-icon {
+      margin-right: 8px;
+      font-size: 20px;
+    }
+  }
+  
+  .add-exercise-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    
+    &:hover {
+      background-color: #0069d9;
+    }
+  }
+  
+  .save-button {
+    background-color: #2dd36f;
+    color: white;
+    border: none;
+    margin-top: auto;
+    
+    &:hover {
+      background-color: #28bd62;
     }
     
     &:disabled {
