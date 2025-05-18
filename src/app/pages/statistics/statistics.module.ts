@@ -10,8 +10,7 @@ import { StatisticsPage } from './statistics.page';
     CommonModule,
     FormsModule,
     IonicModule,
-    StatisticsPageRoutingModule,
-    StatisticsPage
+    StatisticsPageRoutingModule
   ]
 })
 export class StatisticsPageModule {}

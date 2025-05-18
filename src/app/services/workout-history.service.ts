@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, throwError, of } from 'rxjs';
-import { catchError, map, tap, switchMap } from 'rxjs/operators';
+import { catchError, map, tap, switchMap, timeout } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { ActiveWorkout } from '../models/active-workout.model';
 import { Exercise } from '../models/exercise.model';
@@ -101,7 +101,6 @@ export class WorkoutHistoryService {
     // Use our saveWorkoutToHistory method with the safe workout object
     return this.saveWorkoutToHistory(safeWorkout, exercises);
   }
-
   /**
    * Get all workout history items for the current user
    */
@@ -109,13 +108,14 @@ export class WorkoutHistoryService {
     return this.authService.currentUser$.pipe(
       switchMap(user => {
         if (!user || !user.userId) {
-          console.error('No authenticated user found');
+          console.warn('No authenticated user found for workout history');
           return of([]);
         }
         
         console.log('Fetching workout history for user:', user.userId);
         
         return this.http.get<any[]>(`${this.apiUrl}/user/${user.userId}`).pipe(
+          timeout(8000), // Add timeout to prevent hanging
           tap(response => {
             console.log('Raw workout history API response:', response);
             // Check the first item to see its structure
@@ -124,14 +124,20 @@ export class WorkoutHistoryService {
             }
           }),
           map(history => {
+            if (!history || !Array.isArray(history)) {
+              console.warn('History is not an array or is null, returning empty array');
+              return [];
+            }
+            
             // Map each item ensuring ID is preserved
             return history.map(item => {
+              if (!item) return null;
               console.log('Individual workout item:', item);
               return {
                 ...item,
                 workoutHistoryId: item.workoutHistoryId || item.id || null,
               };
-            });
+            }).filter(item => item !== null) as WorkoutHistory[];
           }),
           map(history => this.sortWorkoutHistory(history)),
           catchError(error => {
@@ -139,6 +145,10 @@ export class WorkoutHistoryService {
             return of([]);
           })
         );
+      }),
+      catchError(() => {
+        console.error('Error in workout history stream');
+        return of([]);
       })
     );
   }

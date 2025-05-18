@@ -67,22 +67,17 @@ export class ProfilePage implements OnInit {
    * Load user profile and workout statistics
    */
   loadUserProfile() {
-    // Use only the authenticated user information from the auth service
     this.authService.currentUser$.pipe(
       switchMap(user => {
         if (user && user.userId) {
-          // Get basic user info directly from auth service
           this.userId = user.userId;
           this.username = user.username || 'Athlete';
           
-          // Only get stats from the backend
           return this.profileService.getWorkoutStats();
         } else {
-          // Try to validate token if no current user
           return this.authService.validateToken().pipe(
             switchMap(valid => {
               if (valid) {
-                // After validation, try again with current user
                 return this.authService.currentUser$.pipe(
                   switchMap(refreshedUser => {
                     if (refreshedUser && refreshedUser.userId) {
@@ -103,29 +98,24 @@ export class ProfilePage implements OnInit {
     ).subscribe({
       next: (stats) => {
         if (stats) {
-          // Update stats from the endpoint
           this.totalWorkouts = stats.totalWorkouts;
-          this.daysActive = stats.uniqueDays; // Using uniqueDays from the DTO
+          this.daysActive = stats.uniqueDays;
           
-          // If hoursActive is not available from backend, calculate it from workouts
           if (stats.hoursActive !== undefined) {
             this.hoursActive = stats.hoursActive;
           } else {
-            // hoursActive will be calculated when workout history is loaded
             this.hoursActive = 0;
           }
           
           console.log('Workout stats loaded:', stats);
         }
         
-        // Load workout history for display
         this.loadWorkoutHistory();
       },
       error: (error) => {
         console.error('Error loading workout stats:', error);
         this.showToast('Failed to load workout statistics');
         
-        // Still try to load workout history
         this.loadWorkoutHistory();
       }
     });
@@ -142,9 +132,7 @@ export class ProfilePage implements OnInit {
       next: (history) => {
         console.log('Received workout history:', history);
         
-        // Update the workout count based on the actual history
         if (history && history.length > 0) {
-          // Update totalWorkouts with the actual count
           this.totalWorkouts = history.length;
           
           const missingIds = history.filter(w => !w.workoutHistoryId).length;
@@ -178,25 +166,20 @@ export class ProfilePage implements OnInit {
       return;
     }
     
-    // Create an array of observables for each workout detail request
     const detailRequests = workouts.map(workout => {
       if (!workout.workoutHistoryId) {
-        return of(workout); // Return as-is if no ID
+        return of(workout);
       }
       
       return this.workoutHistoryService.getWorkoutHistoryDetail(workout.workoutHistoryId);
     });
     
-    // Execute all requests in parallel
     forkJoin(detailRequests).subscribe({
       next: (detailedWorkouts) => {
         console.log('All workout details loaded:', detailedWorkouts);
         
-        // Make sure the data exists before assigning
         if (detailedWorkouts && detailedWorkouts.length > 0) {
-          // Force Angular change detection by creating a new array
           this.workoutHistory = [...detailedWorkouts];
-            // Debug each workout to verify structure
           this.workoutHistory.forEach((workout, index) => {
             console.log(`Workout ${index}:`, workout);
             console.log(`Has ${workout.exerciseHistories?.length || 0} exercises`);
@@ -218,7 +201,7 @@ export class ProfilePage implements OnInit {
       },
       error: (error) => {
         console.error('Error loading workout details:', error);
-        this.workoutHistory = workouts; // Fall back to basic workouts
+        this.workoutHistory = workouts;
         this.isLoading = false;
         this.showToast('Some workout details could not be loaded');
       }
@@ -233,25 +216,21 @@ export class ProfilePage implements OnInit {
     
     if (!workoutId) {
       console.error('Cannot toggle workout details: missing ID');
-      // Show the error to the user
       this.showToast('Error: Could not load workout details - missing ID');
       return;
     }
     
     if (this.expandedWorkoutId === workoutId) {
-      // If already expanded, collapse it
       console.log('Collapsing workout details');
       this.expandedWorkoutId = null;
       this.expandedWorkoutDetails = null;
       return;
     }
     
-    // Expand the selected workout
     console.log('Expanding workout details for ID:', workoutId);
     this.expandedWorkoutId = workoutId;
     this.loadingDetails = true;
     
-    // Fetch detailed data for this workout
     this.workoutHistoryService.getWorkoutHistoryDetail(workoutId).subscribe({
       next: (details) => {
         console.log('Workout details loaded successfully:', details);
@@ -273,25 +252,21 @@ export class ProfilePage implements OnInit {
   toggleWorkoutDetailsByIndex(index: number, workoutId?: string) {
     console.log(`Toggle workout at index ${index}, raw ID:`, workoutId);
     
-    // Get the actual workout object
     const workout = this.workoutHistory[index];
     
     console.log("Full workout object:", workout);
     console.log("ID from workout object:", workout.workoutHistoryId);
     
     if (this.expandedWorkoutIndex === index) {
-      // If already expanded, collapse it
       this.expandedWorkoutIndex = null;
       this.expandedWorkoutId = null;
       this.expandedWorkoutDetails = null;
       return;
     }
     
-    // Expand the selected workout
     this.expandedWorkoutIndex = index;
     this.loadingDetails = true;
     
-    // Make sure we have a valid ID
     const actualWorkoutId = workoutId || workout.workoutHistoryId;
     
     if (!actualWorkoutId) {
@@ -303,7 +278,6 @@ export class ProfilePage implements OnInit {
     
     this.expandedWorkoutId = actualWorkoutId;
     console.log('Using ID for details request:', actualWorkoutId);
-      // Load workout details with exercises and sets
     this.workoutHistoryService.getWorkoutHistoryDetail(actualWorkoutId).subscribe({
       next: (details) => {        
         console.log('Workout details loaded successfully:', details);
@@ -314,10 +288,8 @@ export class ProfilePage implements OnInit {
             console.log(`Exercise ${i}: ${ex.exerciseName}, Sets: ${ex.exerciseSetHistories?.length || 0}`);
           });
           
-          // Initialize exercise visibility states for the newly loaded details
           this.initializeExerciseVisibility(details);
           
-          // Update the workout in our main array with the detailed version that includes sets
           if (this.workoutHistory[index]) {
             this.workoutHistory[index] = details;
           }
@@ -331,7 +303,6 @@ export class ProfilePage implements OnInit {
         this.loadingDetails = false;
         this.expandedWorkoutId = null;
         
-        // On error, use the workout from the list as a fallback
         this.expandedWorkoutDetails = workout;
         this.showToast('Error loading workout details');
       }
@@ -345,8 +316,6 @@ export class ProfilePage implements OnInit {
       const typedExercise = exercise as ExerciseHistoryWithUIState;
       const key = this.getExerciseKey(typedExercise);
       
-      // Always set the visibility state (don't check if it exists)
-      // This ensures we have a clean state when loading/reloading exercises
       this.exerciseVisibilityMap.set(key, false);
       
       // Debug the exercise sets data
@@ -359,14 +328,11 @@ export class ProfilePage implements OnInit {
   getExerciseKey(exercise: ExerciseHistoryWithUIState): string {
     return `${exercise.exerciseHistoryId || ''}-${exercise.exerciseName}-${exercise.orderPosition}`;
   }
-    /**
-   * Toggle visibility of sets for a specific exercise
-   */  toggleExerciseSets(exercise: ExerciseHistoryWithUIState): void {
-    // Get the current visibility state
+
+    toggleExerciseSets(exercise: ExerciseHistoryWithUIState): void {
     const key = this.getExerciseKey(exercise);
     const currentValue = this.exerciseVisibilityMap.get(key) || false;
     
-    // Debug the exercise to see if sets are available
     console.log('Toggle exercise sets:', exercise);
     console.log('Exercise sets available:', exercise.exerciseSetHistories?.length || 0);
     if (exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0) {
@@ -374,14 +340,12 @@ export class ProfilePage implements OnInit {
     } else {
       console.warn('No sets found for this exercise. This might indicate a data loading issue.');
       
-      // If no sets are found and we're expanding, try to find the workout and ensure sets are loaded
       if (!currentValue && this.expandedWorkoutIndex !== null) {
         const workout = this.workoutHistory[this.expandedWorkoutIndex];
         console.log('Attempting to ensure exercise sets are loaded from workout:', workout);
       }
     }
     
-    // Toggle and update the map
     this.exerciseVisibilityMap.set(key, !currentValue);
   }
   

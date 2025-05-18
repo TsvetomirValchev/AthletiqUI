@@ -1,0 +1,187 @@
+// Statistics overview styling
+.stats-overview {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--ion-color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streak-icon {
+  color: #ff7700;
+  margin-right: 0.5rem;
+}
+
+.rest-icon {
+  color: #5e60ce;
+  margin-right: 0.5rem;
+}
+
+// Improve loading state display
+.calendar-title {
+  min-width: 120px;
+  text-align: center;
+  position: relative;
+}
+
+.calendar-title.loading {
+  opacity: 0.5;
+}
+
+.calendar-spinner {
+  display: none;
+  position: absolute;
+  left: calc(50% - 10px);
+  top: calc(50% - 10px);
+  z-index: 2;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+  font-weight: 500;
+}
+
+// Calendar styling
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 1rem;
+}
+
+.calendar-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+}
+
+.calendar-spinner {
+  margin: 0 10px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: bold;
+  padding: 0.5rem;
+  color: var(--ion-color-medium);
+  border-bottom: 1px solid var(--ion-color-light);
+  margin-bottom: 5px;
+}
+
+.calendar-day {
+  text-align: center;
+  position: relative;
+  height: 32px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem 0;
+  aspect-ratio: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  
+  &:hover {
+    background-color: var(--ion-color-light);
+  }
+}
+
+.calendar-day-current-month {
+  color: var(--ion-color-dark);
+}
+
+.calendar-day-other-month {
+  color: var(--ion-color-medium-shade);
+  opacity: 0.5;
+}
+
+.calendar-day-active {
+  background-color: rgba(229, 56, 59, 0.3);
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(var(--ion-color-primary-rgb), 0.4);
+  
+  &:hover {
+    background-color: var(--ion-color-primary-tint);
+  }
+  
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: white;
+  }
+}
+
+.calendar-day-indicator {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.day-number {
+  font-size: 14px;
+}
+
+// Make all charts responsive
+ion-card-content {
+  canvas {
+    max-height: 300px;
+  }
+}
+
+// Day detail modal
+.day-no-workouts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  
+  ion-icon {
+    font-size: 64px;
+    color: var(--ion-color-medium);
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    color: var(--ion-color-medium);
+    font-size: 18px;
+  }
+}
