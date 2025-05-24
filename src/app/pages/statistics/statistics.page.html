@@ -1,243 +1,96 @@
 <ion-header>
   <ion-toolbar>
     <ion-title>Statistics</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/tabs/settings">
-        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-grid>  <!-- Skeleton screens when loading -->
-    <ion-row *ngIf="isLoading" class="ion-justify-content-center">
-      <!-- Streak skeleton -->
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-skeleton-text animated style="width: 60%"></ion-skeleton-text>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="stats-overview">
-              <div class="stat-item" *ngFor="let i of [1,2,3]">
-                <ion-skeleton-text animated style="width: 30px; height: 30px; margin: auto;"></ion-skeleton-text>
-                <ion-skeleton-text animated style="width: 60%; margin: auto;"></ion-skeleton-text>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-      
-      <!-- Calendar skeleton -->
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <div class="calendar-header">
-              <ion-button fill="clear" disabled>
-                <ion-icon slot="icon-only" name="chevron-back"></ion-icon>
-              </ion-button>
-              <div class="calendar-title">
-                <ion-skeleton-text animated style="width: 100%; margin: auto;"></ion-skeleton-text>
-              </div>
-              <ion-button fill="clear" disabled>
-                <ion-icon slot="icon-only" name="chevron-forward"></ion-icon>
-              </ion-button>
-            </div>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="calendar-grid">
-              <!-- Week day headers skeleton -->
-              <div *ngFor="let day of [0,1,2,3,4,5,6]" class="calendar-day-header">
-                <ion-skeleton-text animated style="width: 70%; margin: auto;"></ion-skeleton-text>
-              </div>
-              <!-- Calendar days skeleton - four rows -->
-              <div *ngFor="let day of [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27]" 
-                   class="calendar-day">
-                <ion-skeleton-text animated style="width: 60%; height: 20px; margin: auto;"></ion-skeleton-text>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-      
-      <!-- Chart skeletons -->
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-skeleton-text animated style="width: 70%"></ion-skeleton-text>
-          </ion-card-header>
-          <ion-card-content>
-            <ion-skeleton-text animated style="width: 100%; height: 200px;"></ion-skeleton-text>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-      <!-- Workout Streak card -->
-    <ion-row *ngIf="!isLoading">
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Workout Streaks</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="stats-overview">
-              <div class="stat-item">
-                <div class="stat-value">
-                  <ion-icon name="flame" class="streak-icon"></ion-icon>
-                  {{ workoutStreak.currentStreak }}
-                </div>
-                <div class="stat-label">Hot Streak</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value">
-                  <ion-icon name="moon" class="rest-icon"></ion-icon>
-                  {{ daysSinceLastWorkout }}
-                </div>
-                <div class="stat-label">Rest Days</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value">{{ workoutStats.hoursActive }}</div>
-                <div class="stat-label">Hours</div>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-    
-    <!-- Workout Calendar Card -->
-    <ion-row *ngIf="!isLoading">
-      <ion-col size="12">
-        <ion-card>          <ion-card-header>
-            <div class="calendar-header">
-              <ion-button fill="clear" [disabled]="isLoading" (click)="previousMonth()">
-                <ion-icon slot="icon-only" name="chevron-back"></ion-icon>
-              </ion-button>
-              <div class="calendar-title">
-                <ion-spinner *ngIf="isLoading" name="crescent" class="calendar-spinner"></ion-spinner>
-                <ion-card-title *ngIf="!isLoading">{{ currentMonth | date:'MMMM yyyy' }}</ion-card-title>
-              </div>
-              <ion-button fill="clear" [disabled]="isLoading" (click)="nextMonth()">
-                <ion-icon slot="icon-only" name="chevron-forward"></ion-icon>
-              </ion-button>
-            </div>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="calendar-grid">
-              <!-- Week day headers -->
-              <div *ngFor="let day of weekDays" class="calendar-day-header">
-                {{ day }}
-              </div>              <!-- Calendar days -->
-              <div *ngFor="let day of calendarDays" 
-                   [ngClass]="{'calendar-day': true, 
-                              'calendar-day-active': day.hasWorkout,
-                              'calendar-day-current-month': day.date.getMonth() === currentMonth.getMonth(),
-                              'calendar-day-other-month': day.date.getMonth() !== currentMonth.getMonth()}"
-                   (click)="showDayDetails(day)">
-                <div class="day-number">{{ day.dayNumber }}</div>
-                <div *ngIf="day.hasWorkout" class="calendar-day-indicator">🔥</div>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-    
-    <!-- Muscle Group Distribution Card -->
-    <ion-row *ngIf="!isLoading">
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Muscle Group Distribution</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <canvas #muscleGroupChart></canvas>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
+  <!-- Loading indicator -->
+  <div *ngIf="isLoading" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading statistics...</p>
+  </div>
 
-    <!-- Workout Hours Graph Card -->
-    <ion-row *ngIf="!isLoading">
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Workout Hours</ion-card-title>
-            <ion-segment [(ngModel)]="timePeriod" (ionChange)="onTimePeriodChange()">
-              <ion-segment-button value="week">
-                <ion-label>Week</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="month">
-                <ion-label>Month</ion-label>
-              </ion-segment-button>
-              <ion-segment-button value="year">
-                <ion-label>Year</ion-label>
-              </ion-segment-button>
-            </ion-segment>
-          </ion-card-header>
-          <ion-card-content>
-            <canvas #timeChart></canvas>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-    
-    <!-- Weekly Workout Consistency Chart -->
-    <ion-row *ngIf="!isLoading">
-      <ion-col size="12">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>Weekly Workout Consistency</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <canvas #consistencyChart></canvas>
-          </ion-card-content>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-  </ion-grid>
+  <!-- Error message -->
+  <div *ngIf="error" class="error-container">
+    <ion-icon name="warning-outline"></ion-icon>
+    <p>{{ error }}</p>
+    <ion-button (click)="loadStatistics()" size="small">
+      Retry
+    </ion-button>
+  </div>
 
-  <!-- Day Details Modal -->
-  <ion-modal [isOpen]="!!selectedDay">
-    <ng-template>
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>
-            {{ selectedDay?.date | date:'EEEE, MMMM d, y' }}
-          </ion-title>
-          <ion-buttons slot="end">
-            <ion-button (click)="selectedDay = null">
-              <ion-icon name="close"></ion-icon>
-            </ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content>
-        <div *ngIf="selectedDay && selectedDay.workouts && selectedDay.workouts.length > 0">
-          <ion-list>
-            <ion-item-divider>
-              <ion-label>
-                Workouts ({{ selectedDay.workouts.length }})
-              </ion-label>
-            </ion-item-divider>
-            
-            <ion-item *ngFor="let workout of selectedDay.workouts" detail="true" 
-                      [routerLink]="['/workout-history', workout.workoutHistoryId]">                <ion-label>
-                  <h2>{{ workout.name }}</h2>
-                  <p>Duration: {{ workout.duration | formatDuration }}</p>
-                </ion-label>
-            </ion-item>
-          </ion-list>
-        </div>          <div *ngIf="!selectedDay?.hasWorkout" class="day-no-workouts">
-            <ion-icon name="fitness-outline"></ion-icon>
-            <p>No workouts on this day.</p>
-            <ion-button size="small" fill="outline">
-              <ion-icon slot="start" name="add"></ion-icon>
-              Add Workout
-            </ion-button>
+  <!-- Statistics Content -->
+  <div *ngIf="!isLoading" class="statistics-container">
+    <!-- Workout Streaks Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Workout Streaks</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="stats-overview">
+          <div class="stat-item">
+            <div class="stat-value">
+              <span class="emoji">🔥</span> {{ workoutStreak.currentStreak }}
+            </div>
+            <div class="stat-label">Hot Streak</div>
           </div>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
+          <div class="stat-item">
+            <div class="stat-value">
+              <span class="emoji">🌙</span> {{ daysSinceLastWorkout }}
+            </div>
+            <div class="stat-label">Rest Days</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">
+              <ion-icon name="time"></ion-icon> {{ workoutStats.hoursActive }}
+            </div>
+            <div class="stat-label">Hours Active</div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Custom Workout Calendar Card -->
+    <ion-card>
+      <ion-card-header>
+        <div class="calendar-header">
+          <ion-button fill="clear" (click)="previousMonth()">
+            <ion-icon slot="icon-only" name="chevron-back"></ion-icon>
+          </ion-button>
+          <ion-card-title>{{ currentMonth | date:'MMMM yyyy' }}</ion-card-title>
+          <ion-button fill="clear" (click)="nextMonth()">
+            <ion-icon slot="icon-only" name="chevron-forward"></ion-icon>
+          </ion-button>
+        </div>
+      </ion-card-header>
+      <ion-card-content>
+        <!-- Custom Calendar Implementation -->
+        <div class="custom-calendar">
+          <!-- Weekday Headers -->
+          <div class="calendar-header-row">
+            <div *ngFor="let day of weekDays" class="calendar-header-cell">
+              {{ day }}
+            </div>
+          </div>
+          
+          <!-- Calendar Grid -->
+          <div class="calendar-grid">
+            <div 
+              *ngFor="let day of calendarDays"
+              class="calendar-day"
+              [class.outside-month]="!day.isCurrentMonth"
+              [class.has-workout]="day.hasWorkout"
+              [class.today]="day.isToday"
+              [class.selected]="day.isSelected"
+              (click)="selectDate(day)"
+            >
+              <span class="day-number">{{ day.date.getDate() }}</span>
+              <span *ngIf="day.hasWorkout" class="workout-indicator"></span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
 </ion-content>
