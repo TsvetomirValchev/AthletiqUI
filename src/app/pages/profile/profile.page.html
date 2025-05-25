@@ -1,16 +1,15 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>{{ username }}'s Profile</ion-title>
+    <ion-title class="ion-text-center">Profile</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/settings">
+        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <!-- Debug Info -->
-  <div *ngIf="showDebug" style="background: #333; color: #fff; padding: 10px; margin: 10px; font-size: 12px;">
-    <h4>Debug Info</h4>
-    <pre>{{ workoutHistory | json }}</pre>
-  </div>
-
   <!-- User Profile Stats -->
   <div class="user-profile-header">
     <h1>{{ username }}</h1>
@@ -120,7 +119,6 @@
               </div>
                 <!-- Show message if no sets -->              <div *ngIf="exerciseVisibilityMap.get(getExerciseKey(exercise)) && (!exercise.exerciseSetHistories || exercise.exerciseSetHistories.length === 0)" class="no-sets">
                 <p>No sets found for this exercise</p>
-                <p *ngIf="showDebug" class="debug-info">Debug: Exercise ID = {{ exercise.exerciseHistoryId || 'None' }}</p>
               </div>
             </div>
           </div>
@@ -137,7 +135,7 @@
       <ion-icon name="fitness-outline" size="large"></ion-icon>
       <h3>No Workout History</h3>
       <p>Complete a workout to see your history here</p>
-      <ion-button expand="block" routerLink="/tabs/workout" class="start-workout-btn">
+      <ion-button expand="block" routerLink="/tabs/workouts" class="start-workout-btn">
         Start a Workout
       </ion-button>
     </div>

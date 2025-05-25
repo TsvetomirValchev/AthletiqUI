@@ -1,6 +1,11 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Statistics</ion-title>
+    <ion-title class="ion-text-center">Statistics</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/settings">
+        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
@@ -90,6 +95,16 @@
             </div>
           </div>
         </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Muscle Group Focus Chart Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Muscle Group Focus</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <app-muscle-group-chart></app-muscle-group-chart>
       </ion-card-content>
     </ion-card>
   </div>

@@ -234,3 +234,10 @@
     margin-bottom: 1rem;
   }
 }
+
+// Add custom styles for the muscle group chart card
+ion-card:has(app-muscle-group-chart) {
+  margin: 16px;
+  --background: #121212;
+  border-radius: 12px;
+}

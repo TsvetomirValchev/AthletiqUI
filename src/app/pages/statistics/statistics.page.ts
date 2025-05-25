@@ -9,15 +9,21 @@ import { environment } from '../../../environments/environment';
 import { WorkoutStreakData } from '../../models/workout-streak-data.model';
 import { WorkoutStats } from '../../models/workout-stats.model';
 import { CalendarDayData } from '../../models/calendar-day-data.model';
-import { FormatDurationPipe } from '../../pipes/format-duration.pipe';
 import { AuthService } from '../../services/auth.service';
+import { MuscleGroupChartComponent } from '../../components/muscle-group-chart/muscle-group-chart.component';
 
 @Component({
   selector: 'app-statistics',
   templateUrl: './statistics.page.html',
   styleUrls: ['./statistics.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, RouterLink, FormsModule, FormatDurationPipe]
+  imports: [
+    IonicModule, 
+    CommonModule, 
+    RouterLink,
+    FormsModule,
+    MuscleGroupChartComponent
+  ]
 })
 export class StatisticsPage implements OnInit {
   // Loading state
@@ -62,7 +68,6 @@ export class StatisticsPage implements OnInit {
   }
 
   ionViewDidEnter() {
-    // Refresh data when page is entered
     this.loadStatistics();
   }
 
@@ -73,18 +78,12 @@ export class StatisticsPage implements OnInit {
     this.isLoading = true;
     this.error = null;
 
-    // Get the user from AuthService current user observable
     this.authService.currentUser$.pipe(take(1)).subscribe(user => {
       if (!user || !user.userId) {
-        console.log('User not found in currentUser$, attempting to validate token...');
-        
-        // Try to validate token if user is not in currentUser$
         this.authService.validateToken().pipe(take(1)).subscribe(valid => {
           if (valid) {
-            // Token valid, try to get user again
             this.authService.currentUser$.pipe(take(1)).subscribe(validatedUser => {
               if (validatedUser && validatedUser.userId) {
-                console.log('User found after token validation:', validatedUser);
                 this.fetchStatisticsData(validatedUser.userId);
               } else {
                 this.handleUserNotFound();
@@ -95,7 +94,6 @@ export class StatisticsPage implements OnInit {
           }
         });
       } else {
-        console.log('User found in currentUser$:', user);
         this.fetchStatisticsData(user.userId);
       }
     });
@@ -109,9 +107,6 @@ export class StatisticsPage implements OnInit {
     const month = this.currentMonth.getMonth() + 1;
     const monthStr = month.toString().padStart(2, '0');
 
-    console.log(`Loading statistics for userId: ${userId}, year: ${year}, month: ${monthStr}`);
-
-    // Create object to hold all API requests with userId parameter
     const requests = {
       stats: this.http.get<WorkoutStats>(`${this.apiUrl}/statistics/profile-page-stats?userId=${userId}`).pipe(
         catchError(this.handleError<WorkoutStats>('workout stats', { totalWorkouts: 0, uniqueDays: 0, hoursActive: 0 }))
@@ -127,38 +122,29 @@ export class StatisticsPage implements OnInit {
       )
     };
 
-    // Execute all requests in parallel
     forkJoin(requests).pipe(
       finalize(() => {
         this.isLoading = false;
       })
     ).subscribe({
       next: (results) => {
-        console.log('API requests succeeded:', results);
-        
-        // Process stats data
         this.workoutStats = results.stats;
         
-        // Process streak data
         this.workoutStreak = results.streaks;
         
-        // Calculate days since last workout
         if (this.workoutStreak.lastWorkoutDate) {
           const lastDate = new Date(this.workoutStreak.lastWorkoutDate);
           const today = new Date();
           this.daysSinceLastWorkout = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
         }
         
-        // Process calendar data
         if (results.calendarData && results.calendarData.length > 0) {
           this.processCalendarData(results.calendarData);
         }
         
-        // Generate the calendar display
         this.generateCalendarDays();
       },
       error: (err) => {
-        console.error('Error loading statistics:', err);
         this.error = 'Failed to load statistics. Please try again.';
       }
     });
@@ -168,7 +154,6 @@ export class StatisticsPage implements OnInit {
    * Handle when user is not found
    */
   private handleUserNotFound() {
-    console.error('User ID not found. Please log in again.');
     this.error = 'User ID not found. Please log in again.';
     this.isLoading = false;
   }
@@ -179,12 +164,8 @@ export class StatisticsPage implements OnInit {
   processCalendarData(calendarData: CalendarDayData[]) {
     this.workoutDates.clear();
     
-    console.log('Processing calendar data:', calendarData);
-    
-    // Extract dates that have workouts
     calendarData.forEach(day => {
       if (day.hasWorkout) {
-        // Get the date string in YYYY-MM-DD format
         const dateStr = typeof day.date === 'string' 
           ? day.date 
           : new Date(day.date).toISOString().split('T')[0];
@@ -192,8 +173,6 @@ export class StatisticsPage implements OnInit {
         this.workoutDates.add(dateStr);
       }
     });
-    
-    console.log('Workout dates:', Array.from(this.workoutDates));
   }
 
   /**
@@ -202,9 +181,6 @@ export class StatisticsPage implements OnInit {
   generateCalendarDays() {
     const year = this.currentMonth.getFullYear();
     const month = this.currentMonth.getMonth();
-    
-    console.log(`Generating calendar for ${year}-${month+1}`);
-    console.log('Workout dates to highlight:', Array.from(this.workoutDates));
     
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
@@ -221,14 +197,9 @@ export class StatisticsPage implements OnInit {
     this.calendarDays = [];
     let currentDate = new Date(firstDayOfCalendar);
     
-    // Generate all days for the calendar grid
     while (currentDate <= lastDayOfCalendar) {
       const dateStr = this.formatDateToYYYYMMDD(currentDate);
       const hasWorkout = this.workoutDates.has(dateStr);
-      
-      if (hasWorkout) {
-        console.log(`Day ${dateStr} has workout, will be highlighted`);
-      }
       
       this.calendarDays.push({
         date: new Date(currentDate),
@@ -238,7 +209,6 @@ export class StatisticsPage implements OnInit {
         isSelected: this.selectedDate === dateStr
       });
       
-      // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
     }
   }
@@ -285,13 +255,10 @@ export class StatisticsPage implements OnInit {
       const dateStr = this.formatDateToYYYYMMDD(day.date);
       this.selectedDate = dateStr;
       
-      // Update selected state in calendar days
       this.calendarDays = this.calendarDays.map(d => ({
         ...d,
         isSelected: this.formatDateToYYYYMMDD(d.date) === dateStr
       }));
-      
-      console.log('Selected date:', dateStr);
     }
   }
   
@@ -300,9 +267,6 @@ export class StatisticsPage implements OnInit {
    */
   private handleError<T>(operation = 'operation', result?: T) {
     return (error: HttpErrorResponse) => {
-      console.error(`${operation} failed: ${error.message}`);
-      
-      // Let the app keep running by returning an empty result
       return of(result as T);
     };
   }

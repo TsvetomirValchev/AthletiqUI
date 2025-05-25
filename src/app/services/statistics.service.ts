@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpErrorResponse, HttpParams } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
-import { catchError, switchMap, tap, retry } from 'rxjs/operators';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { catchError, switchMap, retry } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
@@ -80,6 +80,31 @@ export class StatisticsService {
     );
   }
   
+  /**
+   * Get muscle group distribution statistics
+   */
+  getMuscleGroupStats(): Observable<any[]> {
+    return this.authService.currentUser$.pipe(
+      switchMap(user => {
+        if (!user || !user.userId) {
+          console.error('Cannot fetch muscle group stats: No user ID available');
+          return of([]);
+        }
+        
+        const params = new HttpParams().set('userId', user.userId);
+        console.log(`Requesting muscle group stats with userId: ${user.userId}`);
+        
+        return this.http.get<any[]>(`${this.apiUrl}/muscle-groups`, { params }).pipe(
+          retry(this.maxRetries),
+          catchError(error => {
+            console.error('Error fetching muscle group stats:', error);
+            return of([]);
+          })
+        );
+      })
+    );
+  }
+
   /**
    * Calculate duration in minutes from ISO 8601 duration string
    * Example: PT1H30M15S -> 90.25 minutes

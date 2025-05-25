@@ -1,21 +1,15 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Workout</ion-title>
+    <ion-title class="ion-text-center">Workout</ion-title>
     <ion-buttons slot="end">
+      <ion-button routerLink="/settings">
+        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
+      </ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="dark-theme">
-  <!-- Quick Start Section -->
-  <div class="section">
-    <div class="section-header">Quick Start</div>
-    <ion-button expand="block" class="action-button" (click)="startEmptyWorkout()">
-      <ion-icon name="add" slot="start"></ion-icon>
-      Start Empty Workout
-    </ion-button>
-  </div>
-
   <!-- Routines Section -->
   <div class="section">
     <div class="routines-header">

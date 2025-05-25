@@ -23,15 +23,7 @@ export class SettingsPage implements OnInit {
   ) { }
 
   ngOnInit() {
-    // Check if dark mode is enabled
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
-    this.darkMode = prefersDark.matches;
-    this.toggleDarkTheme(this.darkMode);
-
-    // Listen for changes to dark mode preference
-    prefersDark.addEventListener('change', (e) => {
-      this.darkMode = e.matches;
-    });
+ 
   }
 
   toggleDarkTheme(shouldAdd: boolean) {
@@ -105,7 +97,22 @@ export class SettingsPage implements OnInit {
           text: 'Delete',
           cssClass: 'danger',
           handler: () => {
-            // Account deletion logic
+            this.authService.deleteAccount().subscribe({
+              next: () => {
+                this.router.navigate(['/login']);
+              },
+              error: async (error) => {
+                console.error('Failed to delete account:', error);
+                
+                const errorAlert = await this.alertController.create({
+                  header: 'Error',
+                  message: 'Failed to delete account. Please try again later.',
+                  buttons: ['OK']
+                });
+                
+                await errorAlert.present();
+              }
+            });
           }
         }
       ]
