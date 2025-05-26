@@ -528,11 +528,8 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
             
             loading.dismiss();
             this.showToast('Workout completed successfully');
+            this.router.navigate(['/tabs/profile']);
             
-            // Small delay to ensure state updates propagate
-            setTimeout(() => {
-              this.router.navigate(['/tabs/profile']);
-            }, 100);
           } catch (error) {
             console.error('Error cleaning up after workout completion:', error);
             loading.dismiss();

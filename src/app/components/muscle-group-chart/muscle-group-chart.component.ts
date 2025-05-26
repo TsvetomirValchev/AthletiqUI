@@ -72,10 +72,7 @@ export class MuscleGroupChartComponent implements OnInit {
         this.isLoading = false;
       })
     ).subscribe(stats => {
-      // Add a small delay to ensure DOM is ready before creating/updating chart
-      setTimeout(() => {
-        this.processStatsData(stats || []);
-      }, 50);
+      this.processStatsData(stats || []);
     });
   }
 

@@ -31,7 +31,8 @@ const routes: Routes = [
   },
   {
     path: 'active-workout',
-    loadChildren: () => import('./pages/active-workout/active-workout.module').then(m => m.ActiveWorkoutPageModule)
+    loadChildren: () => import('./pages/active-workout/active-workout.module').then(m => m.ActiveWorkoutPageModule),
+    canActivate: [authGuard]
   },
   {
     path: 'settings',

@@ -250,10 +250,8 @@ export class CreateRoutinePage implements OnInit {
         exercise.sets = [...exercise.sets];
         
         this.changeDetector.markForCheck();
+        this.changeDetector.detectChanges();
         
-        setTimeout(() => {
-          this.changeDetector.detectChanges();
-        });
       }
     }
   }
