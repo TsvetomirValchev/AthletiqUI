@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, forkJoin, throwError, from } from 'rxjs';
+import { Observable, of, forkJoin, throwError, from, BehaviorSubject, Subject } from 'rxjs';
 import { map, catchError, switchMap, concatMap, toArray, tap, finalize } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { Workout } from '../models/workout.model';
@@ -16,6 +16,13 @@ import { ActiveWorkoutService } from './active-workout.service';
 export class WorkoutService {
   private apiUrl = `${environment.apiUrl}/workouts`;
   
+  // Add this for refresh notifications
+  private workoutsRefreshSubject = new Subject<void>();
+  public workoutsRefresh$ = this.workoutsRefreshSubject.asObservable();
+  
+  // Add cache property (match whatever property name you're actually using)
+  private workoutsCache: any = null;
+
   constructor(
     private http: HttpClient,
     private exerciseTemplateService: ExerciseTemplateService,
@@ -396,28 +403,88 @@ export class WorkoutService {
    * Load an exercise with all its sets
    */
   public loadExerciseWithSets(workoutId: string, exerciseId: string): Observable<Exercise> {
-    return this.getWorkoutExerciseById(workoutId, exerciseId).pipe(
-      switchMap(exercise => {
-        if (!exercise.exerciseSetIds?.length) {
-          return of(exercise);
-        }
-        
-        return this.getExerciseSetsForExercise(workoutId, exerciseId).pipe(
-          map(sets => ({
-            ...exercise,
-            sets: sets
-          }))
-        );
-      }),
-      this.handleError('loadExerciseWithSets')
-    );
+    return this.http.get<Exercise>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}`)
+      .pipe(
+        switchMap(exercise => {
+          // Load sets for this exercise
+          return this.http.get<ExerciseSet[]>(
+            `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets`
+          ).pipe(
+            map(sets => {
+              // Sort sets by order position
+              const sortedSets = sets.sort((a, b) => 
+                (a.orderPosition || 0) - (b.orderPosition || 0));
+            
+              // Assign sets to the exercise
+              return {
+                ...exercise,
+                sets: sortedSets
+              };
+            }),
+            catchError(error => {
+              console.error('Error loading sets:', error);
+              // Return the exercise without sets if there's an error
+              return of({
+                ...exercise,
+                sets: []
+              });
+            })
+          );
+        })
+      );
   }
 
   /**
    * Force refresh workouts data
    */
-  public refreshWorkouts(): Observable<{workout: Workout, exercises: Exercise[]}[]> {
-    // Clear any cached data if needed
-    return this.getWorkoutsWithExercises();
+  public refreshWorkouts(): Observable<boolean> {
+    // Clear any cached data - using the correct property name
+    this.workoutsCache = null;
+    
+    // Emit the event to notify subscribers
+    this.workoutsRefreshSubject.next();
+    
+    // Return observable for chaining
+    return of(true);
+  }
+
+  // Add this method to your WorkoutService
+  removeExerciseFromWorkout(workoutId: string, exerciseId: string): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}`)
+      .pipe(
+        tap(() => {
+          console.log(`Exercise ${exerciseId} removed from workout ${workoutId}`);
+          // Clear any cached data
+          if (this.workoutsCache) {
+            this.workoutsCache = null;
+          }
+        }),
+        catchError(error => {
+          console.error('Error removing exercise from workout:', error);
+          return throwError(() => new Error('Failed to remove exercise'));
+        })
+      );
+  }
+
+  removeSetFromExercise(
+    workoutId: string, 
+    exerciseId: string, 
+    orderPosition: number
+  ): Observable<any> {
+    return this.http.delete<any>(
+      `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets/${orderPosition}`
+    ).pipe(
+      tap(() => {
+        console.log(`Set ${orderPosition} removed from exercise ${exerciseId}`);
+        // Clear any cached data
+        if (this.workoutsCache) {
+          this.workoutsCache = null;
+        }
+      }),
+      catchError(error => {
+        console.error('Error removing set from exercise:', error);
+        return throwError(() => new Error('Failed to remove set'));
+      })
+    );
   }
 }

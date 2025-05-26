@@ -313,7 +313,12 @@ export class CreateRoutinePage implements OnInit {
         this.workoutService.updateWorkoutWithExercises(workoutData, exercisesToSave)
           .subscribe({
             next: () => {
-              this.router.navigate(['/tabs/workouts']);
+              // Force a refresh before navigation
+              this.workoutService.refreshWorkouts();
+              
+              // Simple solution: don't use router navigation, use window location
+              // This forces a complete page reload which will refresh everything
+              window.location.href = '/tabs/workouts';
               this.showToast('Workout updated successfully');
             },
             error: (error) => {
@@ -326,13 +331,10 @@ export class CreateRoutinePage implements OnInit {
         this.workoutService.createWorkoutWithExercises(workoutData, exercisesToSave)
           .subscribe({
             next: () => {
-              // Force a refresh of the workout list before navigating
-              this.workoutService.refreshWorkouts().subscribe({
-                next: () => {
-                  this.router.navigate(['/tabs/workouts']);
-                  this.showToast('Workout created successfully');
-                },
-                error: (error) => console.error('Error refreshing workouts:', error)
+              // Trigger refresh before navigating
+              this.workoutService.refreshWorkouts().subscribe(() => {
+                this.router.navigate(['/tabs/workouts'], { replaceUrl: true });
+                this.showToast('Workout created successfully');
               });
             },
             error: (error) => {
@@ -435,37 +437,66 @@ export class CreateRoutinePage implements OnInit {
   }
 
   async showExerciseOptions(exerciseIndex: number) {
+    const exercise = this.exercises[exerciseIndex];
+    
+    const buttons = [
+      {
+        text: 'View Details',
+        icon: 'information-circle-outline',
+        handler: () => {
+          const templateId = exercise.exerciseTemplateId;
+          if (templateId) {
+            this.viewExerciseDetails(templateId);
+          } else {
+            this.showToast('Exercise template ID is missing');
+          }
+        }
+      },
+      {
+        text: 'Delete Exercise',
+        role: 'destructive',
+        icon: 'trash',
+        handler: () => {
+          // Show a confirmation alert before deleting
+          this.confirmDeleteExercise(exerciseIndex);
+        }
+      },
+      {
+        text: 'Cancel',
+        role: 'cancel',
+        icon: 'close'
+      }
+    ];
+    
     const actionSheet = await this.actionSheetController.create({
       header: 'Exercise Options',
+      buttons: buttons
+    });
+    await actionSheet.present();
+  }
+
+  // Add this helper method
+  async confirmDeleteExercise(exerciseIndex: number) {
+    const exercise = this.exercises[exerciseIndex];
+    const alert = await this.alertController.create({
+      header: 'Delete Exercise',
+      message: `Are you sure you want to remove ${exercise.name} from this workout?`,
       buttons: [
         {
-          text: 'View Details',
-          icon: 'information-circle-outline',
-          handler: () => {
-            const templateId = this.exercises[exerciseIndex].exerciseTemplateId;
-            if (templateId) {
-              this.viewExerciseDetails(templateId);
-            } else {
-              this.showToast('Exercise template ID is missing');
-            }
-          }
+          text: 'Cancel',
+          role: 'cancel'
         },
         {
-          text: 'Delete Exercise',
+          text: 'Delete',
           role: 'destructive',
-          icon: 'trash',
           handler: () => {
             this.removeExercise(exerciseIndex);
           }
-        },
-        {
-          text: 'Cancel',
-          role: 'cancel',
-          icon: 'close'
         }
       ]
     });
-    await actionSheet.present();
+    
+    await alert.present();
   }
 
   async viewExerciseDetails(templateId: string) {
@@ -490,9 +521,85 @@ export class CreateRoutinePage implements OnInit {
     await alert.present();
   }
 
-  removeExercise(index: number) {
+async removeExercise(index: number) {
+  // Get the exercise to remove
+  const exerciseToRemove = this.exercises[index];
+  
+  // Get current workout ID
+  const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
+  
+  // If we have both a workout ID and the exercise has an ID, it's an existing exercise
+  if (workoutId && exerciseToRemove.exerciseId) {
+    try {
+      // Show loading
+      const loading = await this.toastController.create({
+        message: 'Deleting exercise...',
+        duration: 3000
+      });
+      await loading.present();
+      
+      // Call the API to delete the exercise
+      this.workoutService.removeExerciseFromWorkout(workoutId, exerciseToRemove.exerciseId)
+        .subscribe({
+          next: () => {
+            // Remove from local array
+            this.exercises.splice(index, 1);
+            this.showToast('Exercise removed successfully');
+            
+            // Clear any temporary sets for this exercise
+            if (exerciseToRemove.exerciseId) {
+              this.tempExerciseSets.delete(exerciseToRemove.exerciseId);
+            }
+          },
+          error: (error) => {
+            console.error('Error removing exercise:', error);
+            this.showToast('Failed to remove exercise');
+          }
+        });
+    } catch (error) {
+      console.error('Error in removeExercise:', error);
+      this.showToast('An unexpected error occurred');
+    }
+  } else {
+    // For new exercises that aren't saved to the backend yet
     this.exercises.splice(index, 1);
+    
+    // Clear any temporary sets for this exercise
+    if (this.tempNewExerciseSets.has(index)) {
+      this.tempNewExerciseSets.delete(index);
+    }
   }
+
+  this.reindexTempExerciseSets();
+  // Force change detection to update UI
+  this.changeDetector.detectChanges();
+}
+
+// Add this helper method to reindex temporary exercise sets after deletion
+private reindexTempExerciseSets() {
+  // Create a new map to store the reindexed sets
+  const updatedTempSets = new Map<number, ExerciseSet[]>();
+  
+  // Map each exercise to its current index
+  this.exercises.forEach((exercise, index) => {
+    if (!exercise.exerciseId) {
+      // Use Array.from to convert entries to an array we can iterate
+      const entries = Array.from(this.tempNewExerciseSets.entries());
+      for (let i = 0; i < entries.length; i++) {
+        const [oldIndex, sets] = entries[i];
+        // Check if this is the same exercise at the new index
+        if (index < this.exercises.length && this.exercises[oldIndex] === exercise) {
+          // This is the same exercise, update its index
+          updatedTempSets.set(index, sets);
+          break;
+        }
+      }
+    }
+  });
+  
+  // Replace the old map with the reindexed one
+  this.tempNewExerciseSets = updatedTempSets;
+}
 
   async showToast(message: string) {
     const toast = await this.toastController.create({

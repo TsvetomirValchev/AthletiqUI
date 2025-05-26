@@ -18,12 +18,16 @@
 <ion-content class="create-routine-page">
   <!-- Timer Controls -->
   <div class="timer-controls-container">
+    <!-- Timer section with pause/resume buttons -->
     <div class="timer-controls">
-      <ion-button *ngIf="workoutActive" (click)="pauseWorkout()" color="warning" class="pause-button">
-        PAUSE
+      <ion-button *ngIf="!isPaused" (click)="pauseWorkout()" color="warning">
+        <ion-icon name="pause"></ion-icon>
+        Pause
       </ion-button>
-      <ion-button *ngIf="!workoutActive" (click)="resumeWorkout()" color="success" class="resume-button">
-        RESUME
+      
+      <ion-button *ngIf="isPaused" (click)="resumeWorkout()" color="success">
+        <ion-icon name="play"></ion-icon>
+        Resume
       </ion-button>
     </div>
   </div>
@@ -140,28 +144,35 @@
             </div>
             <div class="kg-col">
               <ion-item class="input-item">
-                <ion-input
-                  type="number"
-                  [(ngModel)]="set.weight"
-                  inputmode="decimal"
-                  min="0"
-                  placeholder="0">
-                </ion-input>
+                <!-- For weight input -->
+<ion-input
+  type="number"
+  [(ngModel)]="set.weight"
+  (ionChange)="onWeightChange(set, set.weight || 0)"
+  inputmode="decimal"
+  min="0"
+  placeholder="0">
+</ion-input>
               </ion-item>
             </div>
             <div class="reps-col">
               <ion-item class="input-item">
-                <ion-input
-                  type="number"
-                  [(ngModel)]="set.reps"
-                  inputmode="numeric"
-                  min="0"
-                  placeholder="0">
-                </ion-input>
+                <!-- For reps input -->
+<ion-input
+  type="number"
+  [(ngModel)]="set.reps"
+  (ionChange)="onRepsChange(set, set.reps || 0)"
+  inputmode="numeric"
+  min="0"
+  placeholder="0">
+</ion-input>
               </ion-item>
             </div>
             <div class="completed-col">
-              <ion-checkbox class="set-completion-checkbox" [(ngModel)]="set.completed"></ion-checkbox>
+              <ion-checkbox 
+                [checked]="isSetCompleted(set.exerciseSetId) | async" 
+                (ionChange)="toggleSetComplete(set)">
+              </ion-checkbox>
             </div>
           </div>
           

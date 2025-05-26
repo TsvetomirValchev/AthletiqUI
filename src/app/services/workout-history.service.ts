@@ -82,24 +82,62 @@ export class WorkoutHistoryService {
   /**
    * Complete a workout and save it to history
    */
-  public completeWorkout(workout: ActiveWorkout, exercises: Exercise[]): Observable<WorkoutHistory> {
-    console.log('Completing workout with ID:', workout.workoutId);
+  public completeWorkout(workout: ActiveWorkout, exercises: Exercise[]): Observable<any> {
+    console.log('Completing workout with exercises:', exercises);
     
-    // Make sure we have a valid workout ID
-    if (!workout.workoutId) {
-      return throwError(() => new Error('Cannot complete workout: missing workoutId'));
-    }
+    // Check exercise sets and log completion status
+    exercises.forEach(exercise => {
+      if (exercise.sets && exercise.sets.length > 0) {
+        // Log exercise completion status
+        const completedSets = exercise.sets.filter(set => set.completed);
+        console.log(
+          `Exercise ${exercise.name}: ${completedSets.length}/${exercise.sets.length} sets completed`
+        );
+      }
+    });
     
-    // Create a new object with explicitly set workoutId to ensure it's not lost
-    const safeWorkout = {
-      ...workout,
-      workoutId: workout.workoutId // Explicitly ensure workoutId is set
+    // Use the duration and elapsed time that was provided by the component
+    console.log(`Using provided workout duration: ${workout.duration}`);
+    const durationInSeconds = workout.duration || 0;
+    
+    // Format current date as YYYY-MM-DD
+    const currentDate = new Date().toISOString().split('T')[0]; 
+    
+    // Create payload for the API with required fields
+    const payload = {
+      userId: workout.userId || localStorage.getItem('userId'),
+      name: workout.name || 'Workout',
+      date: currentDate,
+      duration: workout.duration, // Use the provided duration directly
+      completedAt: new Date().toISOString(),
+      exerciseHistories: exercises.map((exercise, index) => ({
+        exerciseName: exercise.name || 'Exercise',
+        orderPosition: index + 1,
+        notes: exercise.notes || '',
+        exerciseSetHistories: exercise.sets?.map((set, setIndex) => ({
+          orderPosition: set.orderPosition || setIndex + 1,
+          reps: set.reps || 0,
+          weight: set.weight || 0,
+          completed: set.completed || false,
+          type: set.type || 'NORMAL'
+        })) || []
+      }))
     };
     
-    console.log('SafeWorkout workoutId before saveWorkoutToHistory:', safeWorkout.workoutId);
+    console.log(`Saving workout history with duration: ${workout.duration} (${durationInSeconds}s)`);
     
-    // Use our saveWorkoutToHistory method with the safe workout object
-    return this.saveWorkoutToHistory(safeWorkout, exercises);
+    // Send the workout to the backend
+    return this.http.post<any>(`${this.apiUrl}`, payload).pipe(
+      tap(response => {
+        console.log('Workout completed and saved to history successfully:', response);
+      }),
+      catchError(error => {
+        console.error('Error completing workout:', error);
+        console.error('The payload that caused the error:', JSON.stringify(payload, null, 2));
+        if (error.error) console.error('Error details:', error.error);
+        return throwError(() => new Error(`Failed to save workout history: ${error.message || 'Unknown error'}`));
+      })
+    );
   }
   /**
    * Get all workout history items for the current user

@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { WorkoutService } from '../../services/workout.service';
 import { Workout } from '../../models/workout.model';
 import { IonicModule, AlertController, ActionSheetController, ToastController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
 import { Exercise } from '../../models/exercise.model';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-workout',
@@ -13,12 +14,14 @@ import { Exercise } from '../../models/exercise.model';
   standalone: true,
   imports: [IonicModule, CommonModule, RouterLink]
 })
-export class WorkoutPage implements OnInit {
+export class WorkoutPage implements OnInit, OnDestroy {
   workouts: Workout[] = [];
   workoutExercises: Map<string, Exercise[]> = new Map();
   isLoading = false;
   
   private exercisesCache = new Map<string, Exercise[]>();
+  private subscription: Subscription = new Subscription();
+  private justLoaded = false; // Add this property to WorkoutPage
 
   constructor(
     private workoutService: WorkoutService,
@@ -30,10 +33,26 @@ export class WorkoutPage implements OnInit {
 
   ngOnInit() {
     this.loadWorkouts();
+    
+    // Subscribe to refresh events
+    this.subscription.add(
+      this.workoutService.workoutsRefresh$.subscribe(() => {
+        console.log('Workouts refresh event received');
+        this.loadWorkouts();
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
   }
 
   loadWorkouts() {
     this.isLoading = true;
+    this.justLoaded = true; // Modify loadWorkouts
+    
+    // Set a timeout to reset the flag after 500ms
+    setTimeout(() => this.justLoaded = false, 500);
     
     this.workoutService.getWorkoutsWithExercises().subscribe({
       next: (workoutsWithExercises) => {
@@ -154,6 +173,8 @@ export class WorkoutPage implements OnInit {
   }
 
   ionViewWillEnter() {
-    this.loadWorkouts();
+    if (!this.justLoaded) { // Update ionViewWillEnter
+      this.loadWorkouts();
+    }
   }
 }

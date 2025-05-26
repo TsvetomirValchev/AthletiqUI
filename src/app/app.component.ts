@@ -1,63 +1,60 @@
-import { Component } from '@angular/core';
-import { Platform } from '@ionic/angular';
-import { AuthService } from './services/auth.service';
-import { WorkoutService } from './services/workout.service';
-import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { Workout } from './models/workout.model';
+import { Component, OnInit } from '@angular/core';
+import { App } from '@capacitor/app';
+import { Platform, IonicModule } from '@ionic/angular';
+import { RouterModule } from '@angular/router';
+import { ActiveWorkoutService } from './services/active-workout.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
-  standalone: false
+  standalone: true,
+  imports: [
+    IonicModule,
+    RouterModule,
+  ]
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   constructor(
     private platform: Platform,
-    private authService: AuthService,
-    private workoutService: WorkoutService,
-    private router: Router
+    private activeWorkoutService: ActiveWorkoutService
   ) {
     this.initializeApp();
   }
 
-  private _isActiveWorkoutInProgress = false;
-
-  async initializeApp() {
-    this.platform.ready().then(async () => {
-      console.log('App initialized');
-    });
-  }
-  
-  get isLoggedIn(): boolean {
-    return this.authService.isLoggedInSync();
-  }
-  
-  
-  
-  get isActiveWorkoutInProgress(): boolean {
-    this.workoutService.isActiveWorkoutInProgress().subscribe((isActive: boolean) => {
-      this._isActiveWorkoutInProgress = isActive;
-    });
-    return this._isActiveWorkoutInProgress;
-  }
-  
-  async startNewWorkout() {
-    await this.router.navigateByUrl('/tabs/workouts');
+  ngOnInit() {
+    console.log('App component initializing');
     
-    const newWorkout = {
-      name: `Quick Workout ${new Date().toLocaleDateString()}`,
-      exercises: []
-    };
-    
-    this.workoutService.createWorkout(newWorkout).subscribe({
-      next: (createdWorkout: Workout) => {
-        this.workoutService.startWorkout(createdWorkout);
+    // Load any saved workout session
+    this.activeWorkoutService.loadSavedSession().subscribe({
+      next: hasSession => {
+        console.log('Has active workout session:', hasSession);
+        
+        // Force refresh of current workout stream
+        if (hasSession) {
+          const session = this.activeWorkoutService.getCurrentSession();
+          if (session && session.workout) {
+            console.log('Broadcasting active session to components', session.workout);
+            // Force a refresh of the currentSessionSubject to trigger subscribers
+            this.activeWorkoutService['currentSessionSubject'].next({...session});
+          }
+        }
       },
-      error: (error: Error) => {
-        console.error('Error creating workout:', error);
+      error: error => {
+        console.error('Error loading session:', error);
       }
+    });
+  }
+
+  initializeApp() {
+    this.platform.ready().then(() => {
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) {
+          this.activeWorkoutService.saveCurrentSession();
+        }
+      });
+      
+      // App is ready to use
     });
   }
 }
