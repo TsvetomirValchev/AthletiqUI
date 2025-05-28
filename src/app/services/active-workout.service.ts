@@ -1,7 +1,7 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, throwError, interval, of, forkJoin, Subscription, from, Subject } from 'rxjs';
-import { tap, catchError, map, switchMap, mergeMap, distinctUntilChanged } from 'rxjs/operators';
+import { Observable, BehaviorSubject, throwError, interval, of, Subscription, from, Subject } from 'rxjs';
+import { catchError, map, switchMap, concatMap, distinctUntilChanged, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { ActiveWorkout } from '../models/active-workout.model';
 import { Exercise } from '../models/exercise.model';
@@ -9,110 +9,95 @@ import { ExerciseSet } from '../models/exercise-set.model';
 import { Workout } from '../models/workout.model';
 import { StorageService } from './storage.service';
 import { SetType } from '../models/set-type.enum';
+import { IndexedDBService } from './indexed-db.service';
 
-// Simplified WorkoutSession interface (keeping the same structure but simplifying implementation)
+// Define the WorkoutSession interface
 interface WorkoutSession {
   workout: Workout;
   exercises: Exercise[];
   startTime: string;
   elapsedTimeSeconds: number;
   isPaused: boolean;
-  completedSets: Map<string, boolean>;
   lastPausedAt?: number;
   totalPausedSeconds: number;
-  displayTimeSeconds?: number; // Add this to explicitly track displayed time
+}
+
+// Define the structure for pending operations
+interface PendingOperation {
+  type: 'exercise' | 'set';
+  exerciseId?: string;
+  tempId: string;
+  payload: any;
 }
 
 @Injectable({
   providedIn: 'root'
 })
-export class ActiveWorkoutService implements OnDestroy {
-  // Use standard workout endpoints instead of active-workout endpoints
+export class ActiveWorkoutService {
+  // API endpoint
   private workoutApiUrl = `${environment.apiUrl}/workouts`;
   
   // State management
   private currentSessionSubject = new BehaviorSubject<WorkoutSession | null>(null);
   private timerSubscription: Subscription | null = null;
-  
-  // Add a property for autosave
   private autoSaveInterval: any = null;
   
-  // Add this to track visibility state
+  // Visibility tracking
   private readonly VISIBILITY_STORAGE_KEY = 'workout_visibility_state';
-  private wasVisible = true;
-
-  // Add to ActiveWorkoutService
+  
+  // Events
   private workoutCompletedSubject = new Subject<void>();
   public workoutCompleted$ = this.workoutCompletedSubject.asObservable();
+  private workoutModifiedSubject = new Subject<string>();
+  public workoutModified$ = this.workoutModifiedSubject.asObservable();
+
+  // Pending operations queue
+  private pendingOperations: PendingOperation[] = [];
 
   constructor(
     private http: HttpClient,
-    private storage: StorageService
+    private storage: StorageService,
+    private indexedDBService: IndexedDBService // Add this
   ) {
-    // Listen for storage events from other tabs
+    // Setup cross-tab synchronization
     window.addEventListener('storage', (event) => {
       if (event.key === 'activeWorkoutSession' && event.newValue) {
         this.handleExternalStorageChange(event.newValue);
       }
     });
     
-    // Setup auto-save every 30 seconds
+    // Setup auto-save
     this.setupAutoSave();
     
-    // Listen for page visibility changes
-    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
-    
-    // Check if we need to restore after a page load
-    this.checkInitialVisibility();
   }
 
-  // Add or update this getter in ActiveWorkoutService
-  get currentWorkout$(): Observable<any> {
+  // Observable getters
+  get currentWorkout$(): Observable<Workout | null> {
     return this.currentSessionSubject.pipe(
-      map(session => {
-        if (!session) {
-          console.log('No active session in currentWorkout$');
-          return null;
-        }
-        
-        console.log('Emitting workout from session:', session.workout);
-        return session.workout;
-      }),
-      distinctUntilChanged((prev, curr) => {
-        // Only emit when workout ID changes
-        return prev?.workoutId === curr?.workoutId;
-      })
+      map(session => session?.workout || null),
+      distinctUntilChanged((prev, curr) => prev?.workoutId === curr?.workoutId)
     );
   }
 
-  // Add a workout state observable
+  // Workout state observable
   workoutState$ = this.currentSessionSubject.pipe(
-    map(session => {
-      if (!session) return { isActive: false, isPaused: true, elapsedTimeSeconds: 0 };
-      return {
-        isActive: true,
-        isPaused: session.isPaused,
-        elapsedTimeSeconds: session.elapsedTimeSeconds || 0
-      };
-    })
+    map(session => ({
+      isActive: !!session,
+      isPaused: !session || session.isPaused,
+      elapsedTimeSeconds: session?.elapsedTimeSeconds || 0
+    }))
   );
 
   get elapsedTime$(): Observable<number> {
-    return this.workoutState$.pipe(map(state => state.elapsedTimeSeconds || 0));
+    return this.workoutState$.pipe(map(state => state.elapsedTimeSeconds));
   }
 
   get isPaused$(): Observable<boolean> {
     return this.workoutState$.pipe(map(state => state.isPaused));
   }
 
-  loadCurrentWorkout(): void {
-    // Since we're not persisting active workouts in backend,
-    // this won't do anything in frontend-only approach
-    this.currentSessionSubject.next(null);
-  }
-
+  // Get active workouts
   getActiveWorkouts(): Observable<ActiveWorkout[]> {
-    // In frontend-only approach, just return current session or empty
     return this.currentSessionSubject.pipe(
       map(session => {
         if (!session) return [];
@@ -124,28 +109,26 @@ export class ActiveWorkoutService implements OnDestroy {
     );
   }
 
+  // Start a workout
   startWorkout(workout: ActiveWorkout): Observable<ActiveWorkout> {
     console.log(`Starting workout: ${workout.workoutId}`);
     
-    // First check if we already have a saved session for this workout
     return this.loadSavedSession().pipe(
       switchMap(hasSession => {
         const existingSession = this.currentSessionSubject.value;
         
-        // If we have a saved session for this workout, use it directly without API calls
         if (hasSession && existingSession && existingSession.workout.workoutId === workout.workoutId) {
-          console.log('Reusing existing workout session from localStorage');
+          console.log('Reusing existing workout session');
           return of({
             ...existingSession.workout,
             startTime: existingSession.startTime
           });
         }
         
-        // If no saved session, only then initialize a new workout session
-        console.log('No saved session found, fetching workout from API');
+        console.log('Creating new workout session');
         return this.http.get<Workout>(`${this.workoutApiUrl}/${workout.workoutId}`).pipe(
           switchMap(fetchedWorkout => {
-            return this.getExercisesForWorkout(fetchedWorkout.workoutId!).pipe(
+            return this.http.get<Exercise[]>(`${this.workoutApiUrl}/${workout.workoutId}/exercises`).pipe(
               map(exercises => {
                 const session: WorkoutSession = {
                   workout: fetchedWorkout,
@@ -153,8 +136,7 @@ export class ActiveWorkoutService implements OnDestroy {
                   startTime: workout.startTime || new Date().toISOString(),
                   elapsedTimeSeconds: 0,
                   isPaused: false,
-                  completedSets: new Map<string, boolean>(),
-                  totalPausedSeconds: 0 // Initialize paused time to 0
+                  totalPausedSeconds: 0
                 };
                 
                 this.currentSessionSubject.next(session);
@@ -177,57 +159,49 @@ export class ActiveWorkoutService implements OnDestroy {
     );
   }
 
+  // Pause the workout
   pauseWorkout(): void {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession) return;
 
     console.log('Pausing workout');
     
-    // Store the timestamp when paused
     const pausedAt = Date.now();
-    
-    // Update session state
     this.currentSessionSubject.next({
       ...currentSession,
       isPaused: true,
       lastPausedAt: pausedAt
     });
     
-    // Stop the timer
     this.stopTimer();
-    
-    // Save the paused state
     this.saveCurrentSession();
   }
 
+  // Resume the workout
   resumeWorkout(): void {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession || !currentSession.isPaused) return;
 
     console.log('Resuming workout');
     
-    // Calculate the amount of time that passed while paused
     let additionalPausedTime = 0;
     if (currentSession.lastPausedAt) {
       additionalPausedTime = Math.floor((Date.now() - currentSession.lastPausedAt) / 1000);
       console.log(`Workout was paused for ${additionalPausedTime} seconds`);
     }
     
-    // Update session state
     this.currentSessionSubject.next({
       ...currentSession,
       isPaused: false,
-      lastPausedAt: undefined, // Clear the pause timestamp
+      lastPausedAt: undefined,
       totalPausedSeconds: (currentSession.totalPausedSeconds || 0) + additionalPausedTime
     });
     
-    // Restart the timer
     this.startTimer();
-    
-    // Save the resumed state
     this.saveCurrentSession();
   }
 
+  // Finish the workout
   finishWorkout(id: string): Observable<ActiveWorkout> {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession) {
@@ -237,18 +211,13 @@ export class ActiveWorkoutService implements OnDestroy {
     this.stopTimer();
     this.clearAutoSave();
     
-    // Get elapsed time in seconds from the session
     const elapsedTimeSeconds = currentSession.elapsedTimeSeconds;
     
-    console.log('Active workout time:', elapsedTimeSeconds);
-    console.log('Total paused time:', currentSession.totalPausedSeconds || 0);
-    
-    // Convert to ISO 8601 duration format (PT[hours]H[minutes]M[seconds]S)
+    // Format duration in ISO8601
     const hours = Math.floor(elapsedTimeSeconds / 3600);
     const minutes = Math.floor((elapsedTimeSeconds % 3600) / 60);
     const seconds = elapsedTimeSeconds % 60;
     
-    // Build ISO 8601 duration string
     let duration = 'PT';
     if (hours > 0) duration += `${hours}H`;
     if (minutes > 0) duration += `${minutes}M`;
@@ -262,43 +231,38 @@ export class ActiveWorkoutService implements OnDestroy {
       duration: duration
     };
     
-    // Log separately but don't include in object
-    console.log(`Workout finished with active duration: ${duration} (${elapsedTimeSeconds} seconds)`);
+    // Process all pending operations before completing
+    this.processPendingOperations(id);
     
-    // Get the current state of exercises with any local changes applied
+    // Get exercises with current state
     const exercises = this.applyLocalChangesToExercises(currentSession.exercises);
     
-    // Clear the current session
+    // Clear current session
     this.currentSessionSubject.next(null);
+    this.clearSavedSession();
     
-    // Notify that the workout is completed
-    this.notifyWorkoutCompleted();
+    // Notify completion
+    this.workoutCompletedSubject.next();
     
     return of(finishedWorkout);
   }
 
+  // Get exercises for a workout
   getExercisesByWorkoutId(workoutId: string): Observable<Exercise[]> {
-    // Use the correct endpoint - without the "workout/" part
+    const session = this.currentSessionSubject.value;
+    if (session && session.workout.workoutId === workoutId) {
+      return of(this.applyLocalChangesToExercises(session.exercises));
+    }
+    
     return this.http.get<Exercise[]>(`${this.workoutApiUrl}/${workoutId}/exercises`).pipe(
-      map(exercises => {
-        // Apply any local changes to these exercises
-        const session = this.currentSessionSubject.value;
-        console.log('Current session when getting exercises:', {
-          hasSession: !!session,
-          completedSetsCount: session?.completedSets.size || 0,
-        });
-        
-        // Apply session changes to each exercise
-        return exercises.map(exercise => this.applyLocalChangesToExercise(exercise));
-      }),
+      map(exercises => this.applyLocalChangesToExercises(exercises)),
       catchError(error => {
         console.error(`Error getting exercises for workout ${workoutId}:`, error);
         
-        // If HTTP request fails, try to get exercises from the current session
-        const session = this.currentSessionSubject.value;
-        if (session && session.workout.workoutId === workoutId) {
-          console.log('Returning exercises from current session instead of API');
-          return of(session.exercises.map(exercise => this.applyLocalChangesToExercise(exercise)));
+        // Try to get from local session
+        const currentSession = this.currentSessionSubject.value;
+        if (currentSession && currentSession.workout.workoutId === workoutId) {
+          return of(this.applyLocalChangesToExercises(currentSession.exercises));
         }
         
         return throwError(() => new Error(`Failed to get exercises for workout ${workoutId}`));
@@ -306,107 +270,205 @@ export class ActiveWorkoutService implements OnDestroy {
     );
   }
 
-  // Get exercises for workout using standard workout endpoints
-  private getExercisesForWorkout(workoutId: string): Observable<Exercise[]> {
-    return this.http.get<Exercise[]>(`${this.workoutApiUrl}/${workoutId}/exercises`);
-  }
-
-  addExerciseToWorkout(workoutId: string, exercise: Exercise): Observable<ActiveWorkout> {
-    // Create payload
-    const exercisePayload = {
+  // Add exercise to an active workout
+  addExerciseToWorkout(workoutId: string, exercise: Exercise): Observable<Exercise[]> {
+    const session = this.currentSessionSubject.value;
+    if (!session) return throwError(() => new Error('No active session'));
+    
+    // Create temporary ID for local tracking
+    const tempExerciseId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Clean copy for API
+    const exerciseForApi = {
       ...exercise,
-      workoutId: workoutId,
-      exerciseTemplateId: exercise.exerciseTemplateId
+      exerciseId: undefined,
+      sets: [],
+      // Make sure we have the correct workoutId
+      workoutId: workoutId
     };
     
-    // Use standard workout API
-    return this.http.post<Workout>(
-      `${this.workoutApiUrl}/${workoutId}/exercises`, 
-      exercisePayload
-    ).pipe(
-      switchMap(() => this.refreshWorkoutSession(workoutId))
-    );
-  }
-
-  getWorkoutExerciseById(workoutId: string, exerciseId: string): Observable<Exercise> {
-    // Check if we have this exercise in memory with local changes
-    const currentSession = this.currentSessionSubject.value;
-    if (currentSession && currentSession.workout.workoutId === workoutId) {
-      const exercise = currentSession.exercises.find(e => e.exerciseId === exerciseId);
-      if (exercise) {
-        return of(this.applyLocalChangesToExercise(exercise));
-      }
-    }
+    // Version with temp ID for UI
+    const tempExercise: Exercise = {
+      ...exercise,
+      exerciseId: tempExerciseId,
+      sets: []
+    };
     
-    // Otherwise fetch from API
-    return this.http.get<Exercise>(`${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}`);
-  }
-
-  updateWorkoutExercise(workoutId: string, exerciseId: string, exercise: Exercise): Observable<ActiveWorkout> {
-    return this.http.put<Workout>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}`, 
-      exercise
-    ).pipe(
-      switchMap(() => this.refreshWorkoutSession(workoutId))
+    console.log(`Adding exercise to workout ${workoutId} with temp ID: ${tempExerciseId}`);
+    
+    // Update local state first for immediate UI feedback
+    const updatedExercises = [...session.exercises, tempExercise];
+    this.currentSessionSubject.next({
+      ...session,
+      exercises: updatedExercises
+    });
+    
+    // Save session with temp exercise
+    this.saveCurrentSession();
+    
+    // Immediately make the API call
+    return this.http.post<Exercise>(`${this.workoutApiUrl}/${workoutId}/exercises`, exerciseForApi).pipe(
+      map(backendExercise => {
+        if (!backendExercise.exerciseId) {
+          console.error('Backend returned exercise without ID', backendExercise);
+          return updatedExercises;
+        }
+        
+        // Replace temp ID with real ID
+        const realIdExercises = session.exercises.map(ex => {
+          if (ex.exerciseId === tempExerciseId) {
+            return {
+              ...ex,
+              exerciseId: backendExercise.exerciseId
+            };
+          }
+          return ex;
+        });
+        
+        // Update session with real IDs
+        this.currentSessionSubject.next({
+          ...session,
+          exercises: realIdExercises
+        });
+        
+        // Save updated session
+        this.saveCurrentSession();
+        
+        console.log(`Exercise added with real ID: ${backendExercise.exerciseId}`);
+        
+        // If there were sets added to this exercise while it was temporary,
+        // process them now
+        this.processPendingOperationsForExercise(tempExerciseId, backendExercise.exerciseId, workoutId);
+        
+        return realIdExercises;
+      }),
+      catchError(error => {
+        console.error('Error adding exercise to workout:', error);
+        // Keep temporary ID in case of error - will retry on save
+        return of(updatedExercises);
+      })
     );
   }
 
-  removeExerciseFromWorkout(workoutId: string, exerciseId: string): Observable<ActiveWorkout> {
-    return this.http.delete<Workout>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}`
-    ).pipe(
-      switchMap(() => this.refreshWorkoutSession(workoutId))
-    );
-  }
-
-  getExerciseSets(workoutId: string, exerciseId: string): Observable<ExerciseSet[]> {
-    return this.http.get<ExerciseSet[]>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}/sets`
-    );
-  }
-
-  addSetToExercise(workoutId: string, exerciseId: string, set: ExerciseSet): Observable<ActiveWorkout> {
-    return this.http.post<Workout>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}/sets`, 
-      set
-    ).pipe(
-      switchMap(() => this.refreshWorkoutSession(workoutId))
-    );
-  }
-
-  removeSetFromExercise(workoutId: string, exerciseId: string, orderPosition: number): Observable<ActiveWorkout> {
-    return this.http.delete<Workout>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}/sets/${orderPosition}`
-    ).pipe(
-      switchMap(() => this.refreshWorkoutSession(workoutId))
-    );
-  }
-
-  updateSet(workoutId: string, exerciseId: string, setId: string, set: ExerciseSet): Observable<any> {
-    // In frontend-only approach, we'll update the set in memory
+  // Add a set to an exercise
+  addNewSet(exerciseId: string, orderPosition: number): Observable<ExerciseSet> {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession) {
       return throwError(() => new Error('No active workout session'));
     }
     
-    // Update the session
-    this.currentSessionSubject.next({...currentSession});
+    // Find the exercise
+    const exerciseIndex = currentSession.exercises.findIndex(ex => ex.exerciseId === exerciseId);
+    if (exerciseIndex === -1) {
+      return throwError(() => new Error(`Exercise ${exerciseId} not found`));
+    }
     
-    // Return success without hitting the API
-    return of({ success: true });
+    const exercise = currentSession.exercises[exerciseIndex];
+    const tempSetId = `temp-set-${exerciseId}-${Date.now()}`;
+    
+    // Create set for API
+    const setForApi: ExerciseSet = {
+      type: SetType.NORMAL,
+      orderPosition: orderPosition,
+      reps: 0,
+      weight: 0,
+      restTimeSeconds: 60,
+      completed: false
+    };
+    
+    // Create set with temp ID for local state
+    const newSet: ExerciseSet = {
+      ...setForApi,
+      exerciseSetId: tempSetId,
+      exerciseId: exerciseId
+    };
+
+    // Add locally first
+    const updatedExercise = {
+      ...exercise,
+      sets: [...(exercise.sets || []), newSet]
+    };
+    
+    const updatedExercises = [...currentSession.exercises];
+    updatedExercises[exerciseIndex] = updatedExercise;
+    
+    // Update session with temp set
+    this.currentSessionSubject.next({
+      ...currentSession,
+      exercises: updatedExercises
+    });
+    
+    // Initialize completion status
+    this.saveCurrentSession();
+    
+    // Check if the exercise has a temporary ID
+    if (exerciseId.startsWith('temp-')) {
+      console.log(`Exercise ${exerciseId} has a temp ID, queuing set for later`);
+      
+      // Queue the set creation for when the exercise gets a real ID
+      this.pendingOperations.push({
+        type: 'set',
+        exerciseId: exerciseId,
+        tempId: tempSetId,
+        payload: setForApi
+      });
+      
+      return of(newSet);
+    }
+    
+    // For exercises with real IDs, create the set in the backend
+    return this.http.post<ExerciseSet>(
+      `${this.workoutApiUrl}/${currentSession.workout.workoutId}/exercises/${exerciseId}/sets`,
+      setForApi
+    ).pipe(
+      map(backendSet => {
+        // Update with real ID from backend
+        const updatedExercises = currentSession.exercises.map(ex => {
+          if (ex.exerciseId === exerciseId) {
+            return {
+              ...ex,
+              sets: ex.sets?.map(set => {
+                if (set.exerciseSetId === tempSetId) {                
+                  return {
+                    ...set,
+                    exerciseSetId: backendSet.exerciseSetId
+                  };
+                }
+                return set;
+              })
+            };
+          }
+          return ex;
+        });
+        
+        // Update session with real set ID
+        this.currentSessionSubject.next({
+          ...currentSession,
+          exercises: updatedExercises
+        });
+        
+        this.saveCurrentSession();
+        
+        return {
+          ...newSet,
+          exerciseSetId: backendSet.exerciseSetId
+        };
+      }),
+      catchError(error => {
+        console.error(`Error adding set to exercise ${exerciseId}:`, error);
+        // Return temp set on error - will retry on save
+        return of(newSet);
+      })
+    );
   }
 
-  // Toggle set completion status (frontend-only)
+  // Toggle set completion - simplified version
   toggleSetCompletion(setId: string, completed: boolean): void {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession) return;
     
-    console.log(`Toggling set ${setId} completion to ${completed}`);
+    console.log(`Toggle set ${setId} completion to ${completed}`);
     
-    // Update the completedSets map
-    currentSession.completedSets.set(setId, completed);
-    
-    // Also update the exercise object directly so it persists when saved
     let updated = false;
     const updatedExercises = currentSession.exercises.map(exercise => {
       if (!exercise.sets) return exercise;
@@ -414,18 +476,15 @@ export class ActiveWorkoutService implements OnDestroy {
       const updatedSets = exercise.sets.map(set => {
         if (set.exerciseSetId === setId) {
           updated = true;
-          return {
-            ...set,
-            completed: completed
-          };
+          return { ...set, completed: completed };
         }
         return set;
       });
       
-      return {
-        ...exercise,
-        sets: updatedSets
-      };
+      if (updated) {
+        return { ...exercise, sets: updatedSets };
+      }
+      return exercise;
     });
     
     if (updated) {
@@ -433,25 +492,214 @@ export class ActiveWorkoutService implements OnDestroy {
         ...currentSession,
         exercises: updatedExercises
       });
+      
+      // Save to local storage right away
+      this.saveCurrentSession();
     }
-    
-    // Save changes immediately
-    this.saveCurrentSession();
-    
-    console.log(`Set ${setId} completion status updated to ${completed}`);
   }
 
-  // Sync all local changes to the backend
-  syncAllChanges(workoutId: string): Observable<boolean> {
+  // Update set property
+  updateSetProperty(setId: string, property: string, value: any): void {
     const currentSession = this.currentSessionSubject.value;
-    if (!currentSession || currentSession.workout.workoutId !== workoutId) {
-      return of(false);
-    }
+    if (!currentSession) return;
     
-    return of(true);
+    let updated = false;
+    const updatedExercises = currentSession.exercises.map(exercise => {
+      if (!exercise.sets) return exercise;
+      
+      const updatedSets = exercise.sets.map(set => {
+        if (set.exerciseSetId === setId) {
+          updated = true;
+          return { ...set, [property]: value };
+        }
+        return set;
+      });
+      
+      return { ...exercise, sets: updatedSets };
+    });
+    
+    if (updated) {
+      this.currentSessionSubject.next({
+        ...currentSession,
+        exercises: updatedExercises
+      });
+      this.saveCurrentSession();
+    }
   }
 
-  // Private helper methods
+  // Convenience methods
+  updateSetWeight(setId: string, weight: number): void {
+    this.updateSetProperty(setId, 'weight', weight);
+  }
+
+  updateSetReps(setId: string, reps: number): void {
+    this.updateSetProperty(setId, 'reps', reps);
+  }
+
+  updateSetType(setId: string, type: SetType): void {
+    this.updateSetProperty(setId, 'type', type);
+  }
+
+  // Get current session
+  getCurrentSession(): WorkoutSession | null {
+    return this.currentSessionSubject.value;
+  }
+
+  // Session persistence methods
+  // Save to localStorage - simplified
+  saveCurrentSession(): void {
+    const session = this.currentSessionSubject.value;
+    if (!session || !session.workout || !session.workout.workoutId) return;
+    
+    // Create a directly serializable session
+    const serialized = {
+      id: 'active_session',
+      workout: session.workout,
+      exercises: session.exercises,
+      startTime: session.startTime,
+      elapsedTimeSeconds: session.elapsedTimeSeconds,
+      isPaused: session.isPaused,
+      lastPausedAt: session.lastPausedAt,
+      totalPausedSeconds: session.totalPausedSeconds,
+      lastSaved: new Date().toISOString()
+    };
+    
+    // Save to IndexedDB
+    this.indexedDBService.saveActiveWorkout(serialized).subscribe({
+      next: (success) => {
+        if (success) {
+          console.log('Workout saved to IndexedDB successfully');
+        }
+      },
+      error: (error) => {
+        console.error('Error saving to IndexedDB:', error);
+        
+        // Fallback to storage service
+        this.storage.setItem('activeWorkoutSession', JSON.stringify(serialized))
+          .catch(err => console.error('Error saving workout session:', err));
+      }
+    });
+  }
+
+  // Update loadSavedSession method
+  loadSavedSession(): Observable<boolean> {
+    // First try IndexedDB
+    return this.indexedDBService.getActiveWorkout().pipe(
+      switchMap(savedSession => {
+        if (savedSession) {
+          try {
+            // Create a new session with the loaded data
+            const session: WorkoutSession = {
+              workout: savedSession.workout,
+              exercises: savedSession.exercises || [],
+              startTime: savedSession.startTime,
+              elapsedTimeSeconds: savedSession.elapsedTimeSeconds || 0,
+              isPaused: savedSession.isPaused !== false, 
+              lastPausedAt: savedSession.lastPausedAt,
+              totalPausedSeconds: savedSession.totalPausedSeconds || 0
+            };
+            
+            // Set the current session
+            this.currentSessionSubject.next(session);
+            
+            // Start timer if session is not paused
+            if (!session.isPaused) {
+              this.startTimer();
+            }
+            
+            console.log('Session loaded from IndexedDB:', session);
+            return of(true);
+          } catch (error) {
+            console.error('Error parsing IndexedDB session:', error);
+          }
+        }
+        
+        // If IndexedDB failed, try localStorage as fallback
+        return from(this.storage.getItem('activeWorkoutSession')).pipe(
+          map(localStorageSession => {
+            if (!localStorageSession) {
+              console.log('No saved session found in localStorage');
+              return false;
+            }
+            
+            try {
+              // Parse the saved session
+              const sessionData = JSON.parse(localStorageSession);
+              
+              // Create a new session with the loaded data
+              const session: WorkoutSession = {
+                workout: sessionData.workout,
+                exercises: sessionData.exercises || [],
+                startTime: sessionData.startTime,
+                elapsedTimeSeconds: sessionData.elapsedTimeSeconds || 0,
+                isPaused: sessionData.isPaused !== false, 
+                lastPausedAt: sessionData.lastPausedAt,
+                totalPausedSeconds: sessionData.totalPausedSeconds || 0
+              };
+              
+              // Set the current session
+              this.currentSessionSubject.next(session);
+              
+              // Start timer if session is not paused
+              if (!session.isPaused) {
+                this.startTimer();
+              }
+              
+              console.log('Session loaded from localStorage:', session);
+              return true;
+            } catch (error) {
+              console.error('Error parsing saved session:', error);
+              return false;
+            }
+          }),
+          catchError(() => of(false))
+        );
+      })
+    );
+  }
+
+  clearSavedSession(): Promise<void> {
+    // First clear the current session in memory
+    this.currentSessionSubject.next(null);
+    
+    console.log('Clearing active workout from storage');
+    
+    // Clear from IndexedDB
+    return this.indexedDBService.clearActiveWorkout()
+      .pipe(
+        switchMap(success => {
+          if (success) {
+            console.log('Active workout successfully cleared from IndexedDB');
+          } else {
+            console.warn('Failed to clear from IndexedDB, falling back to localStorage');
+          }
+          
+          // Also clear from localStorage as fallback/redundancy
+          return from(this.storage.removeItem('activeWorkoutSession'));
+        }),
+        tap(() => {
+          // Also clear any related state
+          localStorage.removeItem(this.VISIBILITY_STORAGE_KEY);
+          console.log('Active workout successfully cleared from all storage');
+          
+          // Force notification that workout is completed
+          this.notifyWorkoutCompleted();
+        }),
+        catchError(error => {
+          console.error('Error clearing active workout from storage:', error);
+          // Rethrow to allow caller to handle
+          return throwError(() => error);
+        })
+      ).toPromise();
+  }
+
+  // Add this method to notify completion
+  notifyWorkoutCompleted(): void {
+    // Emit an event that can be listened to by components
+    this.workoutCompletedSubject.next();
+  }
+
+  // Timer methods
   private startTimer(): void {
     this.stopTimer();
     
@@ -459,7 +707,6 @@ export class ActiveWorkoutService implements OnDestroy {
       const currentSession = this.currentSessionSubject.value;
       if (!currentSession || currentSession.isPaused) return;
       
-      // Only increment time when not paused
       this.currentSessionSubject.next({
         ...currentSession,
         elapsedTimeSeconds: currentSession.elapsedTimeSeconds + 1
@@ -474,212 +721,165 @@ export class ActiveWorkoutService implements OnDestroy {
     }
   }
 
-  private refreshWorkoutSession(workoutId: string): Observable<ActiveWorkout> {
+  // Auto-save methods
+  private setupAutoSave(): void {
+    if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
+    
+    this.autoSaveInterval = setInterval(() => {
+      if (this.currentSessionSubject.value) {
+        this.saveCurrentSession();
+      }
+    }, 30000);
+  }
+
+  private clearAutoSave(): void {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
+    }
+  }
+
+  // Helper methods for exercise state - simplified
+  private applyLocalChangesToExercises(exercises: Exercise[]): Exercise[] {
+    // No need to apply changes from completedSets, just return as is
+    return exercises;
+  }
+
+  private applyLocalChangesToExercise(exercise: Exercise): Exercise {
+    // No need to apply changes from completedSets, just return as is
+    return exercise;
+  }
+
+  // Process pending operations
+  private processPendingOperations(workoutId: string): void {
+    const pendingOps = [...this.pendingOperations];
+    this.pendingOperations = [];
+    
+    // Process pending exercise creations first
+    const exerciseOps = pendingOps.filter(op => op.type === 'exercise');
+    
+    // Process pending set operations
+    const setOps = pendingOps.filter(op => op.type === 'set');
+    
+    console.log(`Processing ${pendingOps.length} pending operations (${exerciseOps.length} exercises, ${setOps.length} sets)`);
+  }
+
+  // Process pending operations for a specific exercise
+  private processPendingOperationsForExercise(tempId: string, realId: string, workoutId: string): void {
+    // Find sets waiting to be created for this exercise
+    const pendingSets = this.pendingOperations.filter(
+      op => op.type === 'set' && op.exerciseId === tempId
+    );
+    
+    if (!pendingSets.length) return;
+    
+    console.log(`Processing ${pendingSets.length} pending sets for exercise ${tempId} -> ${realId}`);
+    
+    // Update the exercises in the current session
     const currentSession = this.currentSessionSubject.value;
-    if (!currentSession || currentSession.workout.workoutId !== workoutId) {
-      return throwError(() => new Error('No active workout session'));
+    if (currentSession) {
+      // Update the exercise ID in all affected exercises
+      const updatedExercises = currentSession.exercises.map(exercise => {
+        if (exercise.exerciseId === tempId) {
+          return {
+            ...exercise,
+            exerciseId: realId
+          };
+        }
+        return exercise;
+      });
+      
+      // Update the session
+      this.currentSessionSubject.next({
+        ...currentSession,
+        exercises: updatedExercises
+      });
+      
+      // Save changes
+      this.saveCurrentSession();
     }
     
-    // Fetch updated workout and exercises
-    return this.http.get<Workout>(`${this.workoutApiUrl}/${workoutId}`).pipe(
-      switchMap(updatedWorkout => {
-        return this.getExercisesForWorkout(workoutId).pipe(
-          map(exercises => {
-            // Update the session
-            this.currentSessionSubject.next({
-              ...currentSession,
-              workout: updatedWorkout,
-              exercises: exercises
+    // Process each set
+    from(pendingSets).pipe(
+      concatMap(pendingSet => {
+        const setPayload = {
+          ...pendingSet.payload,
+          exerciseId: realId
+        };
+        
+        return this.http.post<ExerciseSet>(
+          `${this.workoutApiUrl}/${workoutId}/exercises/${realId}/sets`,
+          setPayload
+        ).pipe(
+          map(backendSet => {
+            const currentState = this.currentSessionSubject.value;
+            if (!currentState) return null;
+            
+            // Update the set ID in the exercise sets
+            const updatedExercises = currentState.exercises.map(exercise => {
+              if (exercise.exerciseId === realId) {
+                return {
+                  ...exercise,
+                  sets: exercise.sets?.map(set => {
+                    if (set.exerciseSetId === pendingSet.tempId) {
+                      // Keep the completed status directly on the set
+                      return {
+                        ...set,
+                        exerciseSetId: backendSet.exerciseSetId,
+                        exerciseId: realId
+                      };
+                    }
+                    return set;
+                  })
+                };
+              }
+              return exercise;
             });
             
-            // Return the ActiveWorkout
-            return {
-              ...updatedWorkout,
-              startTime: currentSession.startTime
-            };
+            // Update session with the real set ID
+            this.currentSessionSubject.next({
+              ...currentState,
+              exercises: updatedExercises
+            });
+            
+            this.saveCurrentSession();
+            return backendSet;
+          }),
+          catchError(error => {
+            console.error(`Error processing pending set operation:`, error);
+            return of(null);
           })
         );
       })
-    );
+    ).subscribe({
+      complete: () => {
+        // Remove these operations from the pending list
+        this.pendingOperations = this.pendingOperations.filter(
+          op => !(op.type === 'set' && op.exerciseId === tempId)
+        );
+      }
+    });
   }
 
-  private applyLocalChangesToExercises(exercises: Exercise[]): Exercise[] {
-    const currentSession = this.currentSessionSubject.value;
-    if (!currentSession) return exercises;
-    
-    return exercises.map(exercise => this.applyLocalChangesToExercise(exercise));
-  }
-
-  // Remove these methods or simplify them
-  private applyLocalChangesToExercise(exercise: Exercise): Exercise {
-    const currentSession = this.currentSessionSubject.value;
-    if (!currentSession || !exercise.sets) return exercise;
-    
-    console.log(`Applying completion status to exercise ${exercise.name}`);
-    
-    // Create a deep copy and only apply completion status
-    const exerciseCopy: Exercise = {
-      ...exercise,
-      sets: exercise.sets.map(set => {
-        const setCopy = {...set};
-        
-        // Apply completion status if we have it
-        if (set.exerciseSetId && currentSession.completedSets.has(set.exerciseSetId)) {
-          const completed = currentSession.completedSets.get(set.exerciseSetId);
-          setCopy.completed = completed;
-        }
-        
-        return setCopy;
-      })
-    };
-    
-    return exerciseCopy;
-  }
-
-  // In ActiveWorkoutService
-  // Add these methods to save/load the session
-
-  saveCurrentSession(): void {
-    const session = this.currentSessionSubject.value;
-    if (!session) {
-      console.log('No session to save');
-      return;
-    }
-    
-    // Check if workout is valid before accessing its properties
-    if (!session.workout || !session.workout.workoutId) {
-      console.error('Cannot save session: workout or workoutId is missing', session);
-      return;
-    }
-    
-    // Convert Maps to arrays for serialization
-    const serialized = {
-      workout: session.workout,
-      workoutId: session.workout.workoutId,
-      exercises: session.exercises,
-      startTime: session.startTime,
-      elapsedTimeSeconds: session.elapsedTimeSeconds,
-      isPaused: session.isPaused,
-      completedSets: Array.from(session.completedSets.entries()),
-      lastPausedAt: session.lastPausedAt, // Save pause timestamp
-      totalPausedSeconds: session.totalPausedSeconds, // Save total paused time
-      lastSaved: new Date().toISOString()
-    };
-    
-    this.storage.setItem('activeWorkoutSession', JSON.stringify(serialized))
-      .then(() => console.log('Session saved successfully'))
-      .catch(err => console.error('Error saving workout session:', err));
-  }
-
-  calculateElapsedTimeFromStartTime(startTime: string): number {
-    if (!startTime) return 0;
-    
-    const start = new Date(startTime).getTime();
-    const now = new Date().getTime();
-    
-    // Calculate elapsed seconds
-    return Math.floor((now - start) / 1000);
-  }
-
-  loadSavedSession(): Observable<boolean> {
-    return from(this.storage.getItem('activeWorkoutSession')).pipe(
-      map(savedSession => {
-        if (!savedSession) {
-          console.log('No saved session found');
-          return false;
-        }
-        
-        try {
-          const parsed = JSON.parse(savedSession);
-          console.log('Found saved session for workout:', parsed.workoutId);
-          
-          // Reconstruct the Maps
-          const completedSets = new Map<string, boolean>(parsed.completedSets || []);
-          
-          // Calculate additional paused time if needed
-          let totalPausedSeconds = parsed.totalPausedSeconds || 0;
-          let lastPausedAt = parsed.lastPausedAt;
-          
-          // If the workout was paused when saved, calculate additional pause time
-          if (parsed.isPaused && lastPausedAt) {
-            const additionalPausedTime = Math.floor((Date.now() - lastPausedAt) / 1000);
-            totalPausedSeconds += additionalPausedTime;
-            console.log(`Adding ${additionalPausedTime}s to paused time from closed tab`);
-          }
-          
-          // Use the exercises from localStorage directly
-          const session: WorkoutSession = {
-            workout: parsed.workout,
-            exercises: parsed.exercises || [],
-            startTime: parsed.startTime,
-            elapsedTimeSeconds: parsed.elapsedTimeSeconds || 0,
-            isPaused: parsed.isPaused !== false,
-            completedSets,
-            lastPausedAt,
-            totalPausedSeconds
-          };
-          
-          this.currentSessionSubject.next(session);
-          
-          // Start timer if not paused
-          if (!session.isPaused) {
-            this.startTimer();
-          }
-          
-          console.log('Successfully restored workout session from localStorage');
-          console.log(`Elapsed active time: ${session.elapsedTimeSeconds}s, paused time: ${session.totalPausedSeconds}s`);
-          return true;
-        } catch (error) {
-          console.error('Error parsing saved session:', error);
-          return false;
-        }
-      }),
-      catchError(() => of(false))
-    );
-  }
-
-  clearSavedSession(): Promise<void> {
-    // First notify subscribers that the workout is complete
-    this.currentSessionSubject.next(null);
-    
-    return this.storage.removeItem('activeWorkoutSession')
-      .then(() => {
-        console.log('Active workout session cleared');
-      })
-      .catch(err => {
-        console.error('Error clearing workout session:', err);
-      });
-  }
-
-  // Add this method
+  // Handle external storage changes
   private handleExternalStorageChange(valueStr: string): void {
     try {
       const parsedSession = JSON.parse(valueStr);
       
-      // Reconstruct the Maps - handle case where completedSets might not exist
-      const completedSets = new Map<string, boolean>(parsedSession.completedSets || []);
-      
-      // Create the workout session
       const session: WorkoutSession = {
         workout: parsedSession.workout,
         exercises: parsedSession.exercises || [],
         startTime: parsedSession.startTime,
         elapsedTimeSeconds: parsedSession.elapsedTimeSeconds || 0,
         isPaused: parsedSession.isPaused !== false,
-        completedSets,
-        totalPausedSeconds: 0, // Initialize total paused seconds
+        lastPausedAt: parsedSession.lastPausedAt,
+        totalPausedSeconds: parsedSession.totalPausedSeconds || 0
       };
       
-      // Check if the workout is valid
-      if (!session.workout || !session.workout.workoutId) {
-        console.error('Invalid external workout session data', parsedSession);
-        return;
-      }
+      if (!session.workout || !session.workout.workoutId) return;
       
-      // Update the session in this tab
       this.currentSessionSubject.next(session);
       
-      // Manage timer based on pause state
       if (session.isPaused) {
         this.stopTimer();
       } else {
@@ -690,210 +890,253 @@ export class ActiveWorkoutService implements OnDestroy {
     }
   }
 
-  // Add this method to handle auto-save
-  private setupAutoSave(): void {
-    if (this.autoSaveInterval) {
-      clearInterval(this.autoSaveInterval);
+  // Add this public method for clarity
+  addSetToExercise(exerciseId: string): Observable<Exercise[]> {
+    if (!exerciseId) {
+      return throwError(() => new Error('Exercise ID is required'));
     }
     
-    this.autoSaveInterval = setInterval(() => {
-      const session = this.currentSessionSubject.value;
-      if (session) {
-        console.log('Auto-saving workout session...');
-        this.saveCurrentSession();
-      }
-    }, 30000); // Save every 30 seconds
-  }
-
-  // Add a cleanup method
-  private clearAutoSave(): void {
-    if (this.autoSaveInterval) {
-      clearInterval(this.autoSaveInterval);
-      this.autoSaveInterval = null;
-    }
-  }
-
-  // Make sure to call this in ngOnDestroy if your service implements OnDestroy
-  ngOnDestroy() {
-    this.stopTimer();
-    this.clearAutoSave();
-  }
-
-  // Add this method to check if a set is completed
-  getSetCompletionStatus(setId: string): Observable<boolean> {
-    return this.currentSessionSubject.pipe(
-      map(session => {
-        if (!session || !session.completedSets) return false;
-        return session.completedSets.get(setId) === true;
-      })
-    );
-  }
-
-  // Update this method to handle set property updates directly
-  updateSetProperty(setId: string, property: string, value: any): void {
     const currentSession = this.currentSessionSubject.value;
-    if (!currentSession) return;
+    if (!currentSession) {
+      return throwError(() => new Error('No active workout session'));
+    }
     
-    // Find the set in the exercises directly
-    let updated = false;
+    // Find the exercise
+    const exerciseIndex = currentSession.exercises.findIndex(ex => ex.exerciseId === exerciseId);
+    if (exerciseIndex === -1) {
+      return throwError(() => new Error(`Exercise ${exerciseId} not found`));
+    }
     
-    const updatedExercises = currentSession.exercises.map(exercise => {
-      if (!exercise.sets) return exercise;
+    const exercise = currentSession.exercises[exerciseIndex];
+    
+    // Calculate the next order position
+    const orderPosition = (exercise.sets?.length || 0) + 1;
+    
+    // Create a unique ID for the new set
+    const tempSetId = `temp-set-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create a new set
+    const newSet: ExerciseSet = {
+      exerciseSetId: tempSetId,
+      exerciseId: exerciseId,
+      type: SetType.NORMAL,
+      orderPosition: orderPosition,
+      reps: 0,
+      weight: 0,
+      restTimeSeconds: 0,
+      completed: false
+    };
+    
+    console.log(`Adding set to exercise ${exerciseId}, position ${orderPosition}`);
+    
+    // Add the set to the exercise
+    const updatedExercise = {
+      ...exercise,
+      sets: [...(exercise.sets || []), newSet]
+    };
+    
+    // Update the exercises array
+    const updatedExercises = [...currentSession.exercises];
+    updatedExercises[exerciseIndex] = updatedExercise;
+    
+    // Update the current session
+    const updatedSession = {
+      ...currentSession,
+      exercises: updatedExercises
+    };
+    
+    // Update the behavior subject
+    this.currentSessionSubject.next(updatedSession);
+    
+    // Save to storage immediately
+    console.log('Saving workout session with new set:', updatedSession);
+    this.saveCurrentSession();
+
+    // Now check how many sets we have and log for debugging
+    const currentSets = updatedExercise.sets || [];
+    console.log(`Exercise ${exerciseId} now has ${currentSets.length} sets`);
+    
+    // If the exercise has a real ID (not temporary), save to the backend
+    if (!exerciseId.startsWith('temp-')) {
+      // Create set for API - remove client-only fields
+      const setForApi = {
+        type: newSet.type,
+        orderPosition: newSet.orderPosition,
+        reps: newSet.reps,
+        weight: newSet.weight,
+        restTimeSeconds: newSet.restTimeSeconds,
+      };
       
-      const updatedSets = exercise.sets.map(set => {
-        if (set.exerciseSetId === setId) {
-          updated = true;
-          // Update the property directly
-          return {
-            ...set,
-            [property]: value
-          };
+      this.http.post<ExerciseSet>(
+        `${this.workoutApiUrl}/${currentSession.workout.workoutId}/exercises/${exerciseId}/sets`,
+        setForApi
+      ).pipe(
+        map(backendSet => {
+          // Get the latest state
+          const latestSession = this.currentSessionSubject.value;
+          if (!latestSession) return;
+          
+          // Update the set ID with the one from the backend
+          const finalExercises = latestSession.exercises.map(ex => {
+            if (ex.exerciseId === exerciseId) {
+              return {
+                ...ex,
+                sets: ex.sets?.map(set => {
+                  if (set.exerciseSetId === tempSetId) {
+                    return {
+                      ...set,
+                      exerciseSetId: backendSet.exerciseSetId
+                    };
+                  }
+                  return set;
+                })
+              };
+            }
+            return ex;
+          });
+          
+          // Update the session
+          this.currentSessionSubject.next({
+            ...latestSession,
+            exercises: finalExercises
+          });
+          
+          // Save to storage again with the updated ID
+          this.saveCurrentSession();
+          console.log(`Set ID updated from ${tempSetId} to ${backendSet.exerciseSetId}`);
+        }),
+        catchError(error => {
+          console.error(`Error sending set to backend:`, error);
+          return of(null);
+        })
+      ).subscribe();
+    } else {
+      // Add to pending operations for later
+      this.pendingOperations.push({
+        type: 'set',
+        exerciseId: exerciseId,
+        tempId: tempSetId,
+        payload: {
+          type: newSet.type,
+          orderPosition: newSet.orderPosition,
+          reps: newSet.reps,
+          weight: newSet.weight,
+          restTimeSeconds: newSet.restTimeSeconds,
+          completed: newSet.completed
         }
-        return set;
       });
       
-      return {
-        ...exercise,
-        sets: updatedSets
-      };
-    });
-    
-    if (!updated) {
-      console.warn(`Could not find set with ID ${setId} to update ${property}`);
-      return;
+      console.log(`Set added to pending operations for temp exercise ${exerciseId}`);
     }
     
-    this.currentSessionSubject.next({
+    // Return the updated exercises immediately
+    return of(updatedExercises);
+  }
+
+  // Remove an exercise from a workout
+  removeExerciseFromWorkout(workoutId: string, exerciseId: string): Observable<Exercise[]> {
+    const currentSession = this.getCurrentSession();
+    if (!currentSession) {
+      return throwError(() => new Error('No active workout session'));
+    }
+    
+    // Update local state first for immediate UI feedback
+    const updatedExercises = currentSession.exercises.filter(
+      ex => ex.exerciseId !== exerciseId
+    );
+    
+    // Update the session with the new exercises
+    this.updateSession({
       ...currentSession,
       exercises: updatedExercises
     });
     
-    // Save immediately
+    // Save session to persist changes
     this.saveCurrentSession();
     
-    console.log(`Updated set ${setId} ${property} to ${value}`);
-  }
-
-  // Helper methods remain the same
-  updateSetWeight(setId: string, weight: number): void {
-    this.updateSetProperty(setId, 'weight', weight);
-  }
-
-  updateSetReps(setId: string, reps: number): void {
-    this.updateSetProperty(setId, 'reps', reps);
-  }
-
-  updateSetType(setId: string, type: SetType): void {
-    this.updateSetProperty(setId, 'type', type);
-  }
-
-  // Add this method to track new sets
-  // Update this method to ensure sets are properly added
-addNewSet(exerciseId: string, orderPosition: number): ExerciseSet {
-  const currentSession = this.currentSessionSubject.value;
-  if (!currentSession) {
-    console.error('Cannot add set: no active workout session');
-    throw new Error('No active workout session');
-  }
-  
-  // Find the exercise
-  const exerciseIndex = currentSession.exercises.findIndex(ex => ex.exerciseId === exerciseId);
-  if (exerciseIndex === -1) {
-    console.warn(`Exercise ${exerciseId} not found in session`);
-    throw new Error(`Exercise ${exerciseId} not found`);
-  }
-  
-  // Get the exercise
-  const exercise = currentSession.exercises[exerciseIndex];
-  
-  // Generate a unique ID for the new set
-  const setId = `new-${exerciseId}-${orderPosition}-${Date.now()}`;
-  
-  // Create the new set
-  const newSet: ExerciseSet = {
-    exerciseSetId: setId,
-    exerciseId: exerciseId,
-    orderPosition: orderPosition,
-    type: SetType.NORMAL,
-    reps: 0,
-    weight: 0,
-    restTimeSeconds: 60,
-    completed: false
-  };
-  
-  // Clone the exercise and add the new set
-  const updatedExercise = {
-    ...exercise,
-    sets: [...(exercise.sets || []), newSet]
-  };
-  
-  // Create a new array of exercises with the updated one
-  const updatedExercises = [...currentSession.exercises];
-  updatedExercises[exerciseIndex] = updatedExercise;
-  
-  // Update the session with the new state
-  this.currentSessionSubject.next({
-    ...currentSession,
-    exercises: updatedExercises
-  });
-  
-  // Initialize in completedSets map
-  currentSession.completedSets.set(setId, false);
-  
-  // Save changes to localStorage
-  this.saveCurrentSession();
-  
-  console.log(`Added new set to exercise ${exercise.name}, order: ${orderPosition}, id: ${setId}`);
-  
-  return newSet;
-}
-
-  // Add a getCurrentSession method if it doesn't exist
-  getCurrentSession(): WorkoutSession | null {
-    return this.currentSessionSubject.value;
-  }
-
-  private handleVisibilityChange(): void {
-    if (document.visibilityState === 'hidden') {
-      // Page is being hidden (user navigated away or closed tab)
-      this.wasVisible = false;
-      localStorage.setItem(this.VISIBILITY_STORAGE_KEY, 'hidden');
-      
-      // Pause the workout if it's active
-      const currentSession = this.currentSessionSubject.value;
-      if (currentSession && !currentSession.isPaused) {
-        console.log('App hidden, pausing workout');
-        this.pauseWorkout();
-        this.saveCurrentSession();
-      }
-    } else if (document.visibilityState === 'visible') {
-      // Page is visible again, but don't auto-resume (user must manually resume)
-      this.wasVisible = true;
-      localStorage.setItem(this.VISIBILITY_STORAGE_KEY, 'visible');
-      console.log('App visible again, workout remains paused until manually resumed');
+    // If it's a temporary exercise (not yet saved to backend), just return the updated list
+    if (exerciseId.startsWith('temp-')) {
+      return of(updatedExercises);
     }
-  }
-
-  private checkInitialVisibility(): void {
-    // When app first loads, check if we previously paused due to visibility
-    const previousState = localStorage.getItem(this.VISIBILITY_STORAGE_KEY);
     
-    if (previousState === 'hidden') {
-      // App was previously hidden and is now visible again
-      console.log('App was previously hidden, ensuring workout is paused');
-      const currentSession = this.currentSessionSubject.value;
-      if (currentSession && !currentSession.isPaused) {
-        // Force pause state
-        currentSession.isPaused = true;
-        this.stopTimer();
-        this.currentSessionSubject.next(currentSession);
-        this.saveCurrentSession();
-      }
-    }
+    // Otherwise make the API call to remove it from the backend
+    return this.http.delete<void>(
+      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}`
+    ).pipe(
+      tap(() => {
+        console.log(`Exercise ${exerciseId} removed from workout ${workoutId}`);
+      }),
+      map(() => updatedExercises),
+      catchError(error => {
+        console.error('Error removing exercise:', error);
+        return throwError(() => new Error('Failed to remove exercise'));
+      })
+    );
   }
 
-  // Call this when a workout is completed
-  notifyWorkoutCompleted(): void {
-    this.workoutCompletedSubject.next();
+  // Remove a set from an exercise
+  removeSetFromExercise(exerciseId: string, setId: string): Observable<Exercise[]> {
+    const currentSession = this.getCurrentSession();
+    if (!currentSession) {
+      return throwError(() => new Error('No active workout session'));
+    }
+    
+    // Find the exercise to update
+    const updatedExercises = currentSession.exercises.map(exercise => {
+      if (exercise.exerciseId === exerciseId) {
+        // Make sure there's at least one set remaining
+        if (!exercise.sets || exercise.sets.length <= 1) {
+          return exercise; // Don't remove the last set
+        }
+        
+        // Filter out the set to remove
+        const updatedSets = exercise.sets.filter(set => set.exerciseSetId !== setId);
+        
+        // Update order positions
+        updatedSets.forEach((set, index) => {
+          set.orderPosition = index + 1;
+        });
+        
+        return {
+          ...exercise,
+          sets: updatedSets
+        };
+      }
+      return exercise;
+    });
+    
+    // Update the session with the new exercises
+    this.updateSession({
+      ...currentSession,
+      exercises: updatedExercises
+    });
+    
+    // Save session to persist changes
+    this.saveCurrentSession();
+    
+    // If it's a temporary set (not saved to backend yet), just return the updated list
+    if (setId.startsWith('temp-')) {
+      return of(updatedExercises);
+    }
+    
+    // Otherwise make the API call to remove it from the backend
+    // Check if the service is using the correct endpoint
+    return this.http.delete<void>(
+      `${this.workoutApiUrl}/${currentSession.workout.workoutId}/exercises/${exerciseId}/sets/${setId}`
+    ).pipe(
+      tap(() => {
+        console.log(`Set ${setId} removed from exercise ${exerciseId}`);
+      }),
+      map(() => updatedExercises),
+      catchError(error => {
+        console.error('Error removing set:', error);
+        return throwError(() => new Error('Failed to remove set'));
+      })
+    );
+  }
+
+  // Helper method to update the session
+  private updateSession(session: WorkoutSession): void {
+    this.currentSessionSubject.next(session);
   }
 }

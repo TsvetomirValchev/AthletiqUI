@@ -10,6 +10,11 @@
 </ion-header>
 
 <ion-content class="dark-theme">
+  <!-- Add pull-to-refresh capability -->
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
   <!-- Routines Section -->
   <div class="section">
     <div class="routines-header">

@@ -1,4 +1,4 @@
-import { Component, OnInit, isDevMode } from '@angular/core';
+import { Component, OnInit, isDevMode, OnDestroy } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -11,7 +11,7 @@ import { ExerciseHistory } from '../../models/exercise-history.model';
 import { SetHistory } from '../../models/set-history.model';
 import { AuthService } from '../../services/auth.service';
 import { finalize, switchMap } from 'rxjs/operators';
-import { of, forkJoin, Observable } from 'rxjs';
+import { of, forkJoin, Observable, Subscription } from 'rxjs';
 import { ToastController } from '@ionic/angular';
 import { ExerciseImageService } from '../../services/exercise-image.service';
 import { SetType } from '../../models/set-type.enum';
@@ -28,7 +28,7 @@ interface ExerciseHistoryWithUIState extends ExerciseHistory {
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, RouterLink]
 })
-export class ProfilePage implements OnInit {
+export class ProfilePage implements OnInit, OnDestroy {
   // User profile data
   username: string = '';
   totalWorkouts: number = 0;
@@ -46,6 +46,9 @@ export class ProfilePage implements OnInit {
 
   // Map to track expanded exercise states
   exerciseVisibilityMap: Map<string, boolean> = new Map();
+
+  // Add this property
+  private subscriptions: Subscription = new Subscription();
   
   constructor(
     private profileService: ProfileService,
@@ -57,10 +60,23 @@ export class ProfilePage implements OnInit {
 
   ngOnInit() {
     this.loadUserProfile();
+    
+    // Subscribe to history refresh events
+    this.subscriptions.add(
+      this.workoutHistoryService.historyRefresh$.subscribe(() => {
+        console.log('History refresh event received in profile page');
+        this.loadWorkoutHistory();
+      })
+    );
   }
 
   ionViewWillEnter() {
     this.loadUserProfile();
+  }
+
+  // Add ngOnDestroy to clean up subscriptions
+  ngOnDestroy() {
+    this.subscriptions.unsubscribe();
   }
 
   /**

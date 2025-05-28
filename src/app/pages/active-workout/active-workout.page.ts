@@ -1,9 +1,10 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController, IonicModule, ToastController, LoadingController } from '@ionic/angular';
+import { AlertController, IonicModule, ToastController, LoadingController, ActionSheetController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, take, Observable, of } from 'rxjs';
+import { finalize, map } from 'rxjs/operators'; // Add this missing import
 import { ActiveWorkoutService } from '../../services/active-workout.service';
 import { WorkoutService } from '../../services/workout.service';
 import { WorkoutHistoryService } from '../../services/workout-history.service';
@@ -11,13 +12,16 @@ import { ActiveWorkout } from '../../models/active-workout.model';
 import { Exercise } from '../../models/exercise.model';
 import { ExerciseSet } from '../../models/exercise-set.model';
 import { SetType } from '../../models/set-type.enum';
+import { ExerciseTemplate } from '../../models/exercise-template.model';
+import { Workout } from '../../models/workout.model';
 
 @Component({
   selector: 'app-active-workout',
   templateUrl: './active-workout.page.html',
   styleUrls: ['./active-workout.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule]
+  imports: [IonicModule, CommonModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ActiveWorkoutPage implements OnInit, OnDestroy {
   workout: ActiveWorkout | null = null;
@@ -31,6 +35,14 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   isPaused = false; // Add this property
   isCompleting = false;
 
+  // Add these new properties
+  exerciseTemplates: ExerciseTemplate[] = [];
+  showExerciseLibrary = false;
+  filteredTemplates: ExerciseTemplate[] = [];
+  searchTerm: string = '';
+  selectedMuscleGroup: string = 'All Muscles';
+  selectedEquipment: string = 'All Equipment';
+
   constructor(
     private activeWorkoutService: ActiveWorkoutService,
     private workoutService: WorkoutService,
@@ -40,7 +52,8 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     private alertController: AlertController,
     private toastController: ToastController,
     private changeDetector: ChangeDetectorRef,
-    private loadingController: LoadingController // Inject LoadingController
+    private loadingController: LoadingController,
+    private actionSheetController: ActionSheetController // Inject ActionSheetController
   ) {}
 
   ngOnInit() {
@@ -357,125 +370,187 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
-  // Update the methods to use our simplified approach
-  toggleSetComplete(set: ExerciseSet) {
-    if (!set.exerciseSetId) return;
+  // Format duration as ISO8601 string
+  formatDuration(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
     
-    set.completed = !set.completed;
-    console.log(`Toggling set ${set.exerciseSetId} to ${set.completed}`);
+    let duration = 'PT';
+    if (hours > 0) duration += `${hours}H`;
+    if (minutes > 0) duration += `${minutes}M`;
+    if (secs > 0 || (hours === 0 && minutes === 0)) duration += `${secs}S`;
     
-    // Update service and save
-    this.activeWorkoutService.toggleSetCompletion(set.exerciseSetId, set.completed);
+    return duration;
   }
 
+  // These methods are already properly implemented
+  isSetCompleted(set: ExerciseSet): boolean {
+    // Just return the completed property directly from the set
+    return set?.completed || false;
+  }
+
+  // Update set weight
+  updateSetWeight(set: ExerciseSet, event: any) {
+    const newWeight = Number(event.detail.value);
+    if (isNaN(newWeight)) return;
+    
+    // Update locally first for immediate UI feedback
+    set.weight = newWeight;
+    
+    // Inform the service
+    this.activeWorkoutService.updateSetWeight(set.exerciseSetId!, newWeight);
+  }
+
+  // Update set reps
+  updateSetReps(set: ExerciseSet, event: any) {
+    const newReps = Number(event.detail.value);
+    if (isNaN(newReps)) return;
+    
+    // Update locally first for immediate UI feedback
+    set.reps = newReps;
+    
+    // Inform the service
+    this.activeWorkoutService.updateSetReps(set.exerciseSetId!, newReps);
+  }
+
+  // Toggle set completion
+  toggleSetComplete(set: ExerciseSet) {
+    if (!set || !set.exerciseSetId) return;
+    
+    // Toggle the state locally first
+    set.completed = !set.completed;
+    
+    // Inform the service
+    this.activeWorkoutService.toggleSetCompletion(set.exerciseSetId, set.completed);
+    
+    // Force change detection
+    this.changeDetector.markForCheck();
+  }
+
+  // Update the addExercise method to show the library
   async addExercise() {
     if (!this.workout?.workoutId) return;
     
-    const alert = await this.alertController.create({
-      header: 'Add Exercise',
-      message: 'Select an exercise to add',
-      inputs: [
-        {
-          name: 'exerciseName',
-          type: 'text',
-          placeholder: 'Exercise name'
-        }
-      ],
-      buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel'
+    // Show the library instead of the alert
+    this.showExerciseLibrary = true;
+    this.isLoading = true;
+    
+    // Load templates if needed
+    if (this.exerciseTemplates.length === 0) {
+      this.workoutService.getExerciseTemplates().subscribe({
+        next: (templates) => {
+          this.exerciseTemplates = templates;
+          this.filteredTemplates = [...templates];
+          this.isLoading = false;
         },
+        error: (error) => {
+          console.error('Error loading exercise templates:', error);
+          this.showToast('Error loading exercise templates');
+          this.isLoading = false;
+          this.showExerciseLibrary = false;
+        }
+      });
+    } else {
+      this.filteredTemplates = [...this.exerciseTemplates];
+      this.isLoading = false;
+    }
+  }
+  
+  // Add this method to add an exercise from template
+  addExerciseFromTemplate(template: ExerciseTemplate) {
+    if (!template || !template.exerciseTemplateId || !this.workout?.workoutId) return;
+    
+    // Create Exercise object with template information
+    const newExercise: Exercise = {
+      exerciseTemplateId: template.exerciseTemplateId!,
+      name: template.name,
+      notes: '',
+      workoutId: this.workout!.workoutId,
+      // Initialize with a single set
+      sets: [
         {
-          text: 'Add',
-          handler: (data) => {
-            if (data.exerciseName) {
-              const newExercise: Exercise = {
-                name: data.exerciseName,
-                notes: '',
-                sets: [
-                  {
-                    type: SetType.NORMAL,
-                    orderPosition: 1,
-                    reps: 0,
-                    weight: 0,
-                    restTimeSeconds: 0,
-                    completed: false
-                  }
-                ]
-              };
-              
-              this.exercises.push(newExercise);
-              this.showToast(`Added ${data.exerciseName}`);
-            }
-          }
+          type: SetType.NORMAL,
+          orderPosition: 1,
+          reps: 0,
+          weight: 0,
+          restTimeSeconds: 0,
+          completed: false
         }
       ]
-    });
-    await alert.present();
-  }
-
-  // Update the addSet method in active-workout.page.ts
-  addSet(exercise: Exercise): void {
-    if (!exercise || !exercise.exerciseId) {
-      console.error('Cannot add set: Exercise or exerciseId is missing');
-      return;
-    }
+    };
     
-    // Calculate new order position
-    if (!exercise.sets) {
-      exercise.sets = [];
-    }
-    
-    const newPosition = (exercise.sets.length > 0 ? 
-      Math.max(...exercise.sets.map(s => s.orderPosition || 0)) + 1 : 1);
-    
-    console.log(`Adding new set to exercise ${exercise.name} at position ${newPosition}`);
-    
-    try {
-      // Add the set through the service
-      this.activeWorkoutService.addNewSet(exercise.exerciseId, newPosition);
-      
-      // Refresh exercise data from service to get the updated set
-      const currentSession = this.activeWorkoutService.getCurrentSession();
-      if (currentSession) {
-        const updatedExercise = currentSession.exercises.find(ex => ex.exerciseId === exercise.exerciseId);
-        if (updatedExercise && updatedExercise.sets) {
-          // Update the local exercise with the new set
-          const index = this.exercises.findIndex(ex => ex.exerciseId === exercise.exerciseId);
-          if (index !== -1) {
-            this.exercises[index] = updatedExercise;
-            this.changeDetector.detectChanges(); // Force UI update
-          }
+    // Add the exercise to the active workout through the service
+    this.activeWorkoutService.addExerciseToWorkout(this.workout!.workoutId!, newExercise).subscribe({
+      next: (updatedExercises: Exercise[]) => {
+        // Update the local exercises array with the new data
+        this.exercises = updatedExercises;
+        
+        // Log the exercise IDs to verify they're properly set
+        console.log('Updated exercises with IDs:', 
+          this.exercises.map(e => ({ name: e.name, id: e.exerciseId })));
+        
+        this.showToast(`Added ${template.name}`);
+        
+        // Close the library after selection
+        this.showExerciseLibrary = false;
+        
+        // Check if exercises have valid IDs
+        const hasInvalidIds = this.exercises.some(e => !e.exerciseId);
+        if (hasInvalidIds) {
+          console.warn('Some exercises are missing IDs after update');
         }
+      },
+      error: (error) => {
+        console.error('Error adding exercise:', error);
+        this.showToast('Failed to add exercise');
       }
-    } catch (error) {
-      console.error('Error adding set:', error);
-      this.showToast('Failed to add set');
+    });
+  }
+  
+  // Add search and filter methods
+  filterExercises() {
+    let filtered = [...this.exerciseTemplates];
+    
+    // Apply search term filter
+    if (this.searchTerm) {
+      const search = this.searchTerm.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.name.toLowerCase().includes(search) || 
+        t.targetMuscleGroups?.some(m => m.toLowerCase().includes(search))
+      );
     }
+    
+    // Apply muscle group filter
+    if (this.selectedMuscleGroup && this.selectedMuscleGroup !== 'All Muscles') {
+      filtered = filtered.filter(t => 
+        t.targetMuscleGroups?.includes(this.selectedMuscleGroup)
+      );
+    }
+   
+    
+    this.filteredTemplates = filtered;
+  }
+  
+  onSearch(event: any) {
+    this.searchTerm = event.detail.value;
+    this.filterExercises();
+  }
+  
+  closeLibrary() {
+    this.showExerciseLibrary = false;
   }
 
   async finishWorkout() {
     this.isCompleting = true;
-    if (!this.workout?.workoutId) {
-      this.showToast('No active workout to finish');
-      return;
-    }
-    
+
     try {
-      // Show loading
       const loading = await this.loadingController.create({
-        message: 'Saving workout...',
-        duration: 10000
+        message: 'Completing workout...'
       });
       await loading.present();
       
-      // Get the current timer value directly from the component
-      const timerValue = this.elapsedTime;
-      
-      console.log('Completing workout with timer value:', timerValue);
-      
-      // Get the current session
+      // Get current session from the service
       const currentSession = this.activeWorkoutService.getCurrentSession();
       if (!currentSession) {
         this.showToast('No active session found');
@@ -483,71 +558,251 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         return;
       }
       
-      // Make sure all changes are saved before completing
-      this.activeWorkoutService.saveCurrentSession();
+      // Get a copy of all data we need before clearing
+      const workout = { ...currentSession.workout };
+      const updatedExercises = [...currentSession.exercises];
+      const timerValue = this.elapsedTime;
       
-      // We already have all the exercises in the current session
-      const updatedExercises = currentSession.exercises;
-      
-      // Prepare the workout with duration info using the DISPLAYED timer value
-      const workout = this.workout!;
-      
-      // Convert to ISO 8601 duration format
+      // Format the duration string
       const hours = Math.floor(timerValue / 3600);
       const minutes = Math.floor((timerValue % 3600) / 60);
       const seconds = timerValue % 60;
       
-      // Build ISO 8601 duration string
       let duration = 'PT';
       if (hours > 0) duration += `${hours}H`;
       if (minutes > 0) duration += `${minutes}M`;
       if (seconds > 0 || (hours === 0 && minutes === 0)) duration += `${seconds}S`;
       
-      // Use the component's timer value for the duration
       const workoutWithDuration: ActiveWorkout = {
         ...workout,
         duration: duration,
-        elapsedTimeSeconds: timerValue,
         endTime: new Date().toISOString()
       };
       
       console.log(`Using displayed timer value: ${timerValue}s (${duration})`);
       
+      // Stop the timer to prevent further updates
+      this.stopTimer();
+      
       // Complete the workout - send to backend
-      this.workoutHistoryService.completeWorkout(workoutWithDuration, updatedExercises).subscribe({
-        next: async (response) => {
-          try {
-            // Stop timer first to prevent any further updates
-            this.stopTimer();
-            
-            // IMPORTANT: Now clear the saved session and WAIT for it to complete
-            await this.activeWorkoutService.clearSavedSession();
-            
-            // Force refresh the banner component's state
-            this.activeWorkoutService.notifyWorkoutCompleted();
+      this.workoutHistoryService.completeWorkout(workoutWithDuration, updatedExercises)
+        .pipe(
+          finalize(() => {
+            // Clear the saved session regardless of outcome
+            this.activeWorkoutService.clearSavedSession();
+          })
+        )
+        .subscribe({
+          next: async (response) => {
+            // Force refresh the workout history cache
+            this.workoutHistoryService.refreshHistory();
             
             loading.dismiss();
             this.showToast('Workout completed successfully');
-            this.router.navigate(['/tabs/profile']);
             
-          } catch (error) {
-            console.error('Error cleaning up after workout completion:', error);
+            // Check if the workout template should be updated
+            const hasChanges = this.detectTemplateChanges(workout, updatedExercises);
+            
+            // If there are changes, ask the user if they want to update the template
+            if (hasChanges) {
+              // Wait a moment before showing the next dialog
+              setTimeout(() => {
+                this.confirmUpdateTemplate(workout, updatedExercises);
+              }, 300);
+            } else {
+              this.router.navigate(['/tabs/profile']);
+            }
+          },
+          error: (error) => {
             loading.dismiss();
-            this.router.navigate(['/tabs/profile']);
+            this.showToast('Error completing workout');
+            console.error('Error completing workout:', error);
+            this.isCompleting = false;
           }
-        },
-        error: (error) => {
-          loading.dismiss();
-          this.showToast('Error completing workout');
-          console.error('Error completing workout:', error);
-        }
-      });
+        });
     } catch (error) {
       console.error('Error in finishWorkout:', error);
       this.showToast('An unexpected error occurred');
+      this.isCompleting = false;
     }
   }
 
+  // Move the cleanExercises function to be a proper class method
+  cleanExercises(exercises: Exercise[]): Exercise[] {
+    console.log('Cleaning exercises for template update:', exercises.length);
+    
+    return exercises
+      // Only filter temporary exercises, keep all valid ones
+      .filter(ex => !ex.exerciseId?.startsWith('temp-'))
+      .map(exercise => {
+        // Create a proper copy to avoid reference issues
+        return {
+          ...exercise,
+          // Ensure exerciseTemplateId is preserved
+          exerciseTemplateId: exercise.exerciseTemplateId,
+          // Don't filter temp sets - include them all
+          sets: (exercise.sets || [])
+            .map(set => ({
+              ...set,
+              // Clear exerciseSetId for temp sets so backend creates new ones
+              exerciseSetId: set.exerciseSetId?.startsWith('temp-') ? undefined : set.exerciseSetId,
+              // Ensure exercise ID reference is maintained
+              exerciseId: exercise.exerciseId,
+              // Reset the completion status for the template
+              completed: false
+            }))
+        };
+      });
+  }
+
+  private detectTemplateChanges(workout: Workout, exercises: Exercise[]): boolean {
+    try {
+      // If it's a temporary workout, don't suggest updating a template
+      if (workout.workoutId?.startsWith('temp-')) {
+        console.log('Temporary workout - no template to update');
+        return false;
+      }
+      
+      console.log('Checking for template changes...');
+      
+      // Look for any of the following changes:
+      // 1. New exercises added
+      // 2. Changes to sets (weight, reps, or new sets)
+      
+      // Check for new exercises
+      const newExercises = exercises.filter(ex => 
+        // Exercise ID doesn't start with temp- (it's been saved to backend)
+        // AND it has an exerciseTemplateId (it's based on a template)
+        !ex.exerciseId?.startsWith('temp-') && ex.exerciseTemplateId
+      );
+      
+      if (newExercises.length > 0) {
+        console.log('Found new exercises:', newExercises.length);
+        return true;
+      }
+      
+      // Check for changes to sets
+      for (const exercise of exercises) {
+        // Skip temporary exercises
+        if (exercise.exerciseId?.startsWith('temp-')) continue;
+        
+        const sets = exercise.sets || [];
+        
+        // If we have sets with completed status, weights, or reps
+        if (sets.some(set => {
+          // Consider any populated field as a change
+          const hasWeight = (set.weight ?? 0) > 0;
+          const hasReps = (set.reps ?? 0) > 0;
+          const isCustomType = set.type !== SetType.NORMAL;
+          
+          return hasWeight || hasReps || isCustomType;
+        })) {
+          console.log('Found set changes in exercise:', exercise.name);
+          return true;
+        }
+      }
+      
+      console.log('No significant changes detected in workout');
+      return false;
+    } catch (error) {
+      console.error('Error detecting template changes:', error);
+      return false;
+    }
+  }
+
+  async confirmUpdateTemplate(workout: Workout, exercises: Exercise[]): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Update Routine',
+      message: 'Do you want to update your workout routine template with the changes you made during this session?',
+      buttons: [
+        {
+          text: 'No',
+          role: 'cancel',
+          handler: () => {
+            console.log('User declined to update template');
+            this.router.navigate(['/tabs/profile']);
+          }
+        },
+        {
+          text: 'Yes, Update Routine',
+          handler: async () => {
+            console.log('User confirmed template update');
+            
+            const loading = await this.loadingController.create({
+              message: 'Updating routine...'
+            });
+            await loading.present();
+            
+            // Prepare exercises for template update
+            const templateExercises = this.prepareExercisesForTemplate(exercises);
+            
+            // Update the workout template with clean exercises
+            this.workoutService.updateWorkoutWithExercises(workout, templateExercises)
+              .subscribe({
+                next: () => {
+                  loading.dismiss();
+                  this.showToast('Workout routine updated successfully');
+                  
+                  // Add a small delay to allow the service to refresh data
+                  setTimeout(() => {
+                    this.router.navigate(['/tabs/workouts']);
+                  }, 100);
+                },
+                error: (error: any) => {
+                  loading.dismiss();
+                  console.error('Error updating workout template:', error);
+                  this.showToast('Error updating workout routine');
+                  this.router.navigate(['/tabs/profile']);
+                }
+              });
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  // New method to prepare exercises for template update
+  private prepareExercisesForTemplate(exercises: Exercise[]): Exercise[] {
+    console.log('Preparing exercises for template update:', exercises.length);
+    
+    return exercises
+      // Remove temporary exercises that haven't been saved to backend
+      .filter(ex => !ex.exerciseId?.startsWith('temp-'))
+      .map(exercise => {
+        // Create a proper copy to avoid reference issues
+        return {
+          ...exercise,
+          // Keep the exerciseTemplateId to maintain connection to exercise library
+          exerciseTemplateId: exercise.exerciseTemplateId,
+          sets: (exercise.sets || [])
+            // Sort sets by order position
+            .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0))
+            .map(set => ({
+              ...set,
+              // Clear exerciseSetId for temporary sets so backend creates new ones
+              exerciseSetId: set.exerciseSetId?.startsWith('temp-') ? undefined : set.exerciseSetId,
+              // Ensure exercise ID reference is maintained
+              exerciseId: exercise.exerciseId,
+              // Reset completion status as this is for the template
+              completed: false
+            }))
+        };
+      });
+  }
+
+  // Add missing method for showToast
+  async showToast(message: string) {
+    const toast = await this.toastController.create({
+      message,
+      duration: 2000,
+      position: 'bottom'
+    });
+    await toast.present();
+  }
+
+  // Add missing method for discardWorkout
   async discardWorkout() {
     const alert = await this.alertController.create({
       header: 'Discard Workout',
@@ -560,28 +815,22 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         {
           text: 'Discard',
           role: 'destructive',
-          handler: () => {
-            if (this.timerSubscription) {
-              this.timerSubscription.unsubscribe();
-              this.timerSubscription = null;
-            }
-            
-            if (this.workout?.workoutId) {
-              this.activeWorkoutService.finishWorkout(this.workout.workoutId).subscribe({
-                next: () => {
-                  // Clear saved session when discarding
-                  this.activeWorkoutService.clearSavedSession().then(() => {
-                    this.showToast('Workout discarded');
-                    this.router.navigate(['/tabs/workouts']);
-                  });
-                },
-                error: (error) => {
-                  this.showToast('Error discarding workout');
-                  this.router.navigate(['/tabs/workouts']);
-                }
-              });
-            } else {
+          handler: async () => {
+            try {
+              // Stop the timer
+              this.stopTimer();
+              
+              // Clear the saved session
+              await this.activeWorkoutService.clearSavedSession();
+              
+              // We should notify someone that workout is completed/discarded
+              // Use a method that's actually available from the service
+              // Instead of directly accessing the private subject
+              this.showToast('Workout discarded');
               this.router.navigate(['/tabs/workouts']);
+            } catch (error) {
+              console.error('Error discarding workout:', error);
+              this.showToast('Error discarding workout');
             }
           }
         }
@@ -591,69 +840,67 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     await alert.present();
   }
 
-  async showToast(message: string) {
-    const toast = await this.toastController.create({
-      message,
-      duration: 2000,
-      position: 'bottom'
-    });
-    await toast.present();
-  }
-
-  getPreviousSet(exercise: Exercise, currentIndex: number): ExerciseSet | null {
-    if (currentIndex > 0 && exercise.sets && exercise.sets.length > currentIndex - 1) {
-      return exercise.sets[currentIndex - 1];
+  // Update the addSet method 
+  addSet(exercise: Exercise) {
+    if (!exercise || !exercise.exerciseId) {
+      console.error('Cannot add set: Exercise ID is missing');
+      return;
     }
-    return null;
-  }
-
-  getSetTypeClass(setType?: SetType): string {
-    if (!setType) return 'normal-type';
     
-    switch (setType) {
-      case SetType.WARMUP:
-        return 'warmup-type';
-      case SetType.DROPSET:
-        return 'dropset-type';
-      case SetType.FAILURE:
-        return 'failure-type';
-      default:
-        return 'normal-type';
-    }
-  }
-
-  getSetDisplay(set: ExerciseSet, sets: ExerciseSet[], index: number): string {
-    if (!set.type || set.type === SetType.NORMAL) {
-      let normalCount = 0;
-      for (let i = 0; i <= index; i++) {
-        if (!sets[i].type || sets[i].type === SetType.NORMAL) {
-          normalCount++;
-        }
+    console.log('Adding set to exercise:', exercise.name);
+    
+    // Call the service method directly
+    this.activeWorkoutService.addSetToExercise(exercise.exerciseId).subscribe({
+      next: (updatedExercises: Exercise[]) => {
+        // Create a new array to ensure change detection works
+        this.exercises = [...updatedExercises];
+        
+        // Log the number of sets for debugging
+        const updatedExercise = updatedExercises.find(e => e.exerciseId === exercise.exerciseId);
+        console.log('Updated exercise:', updatedExercise?.name, 
+                    'Sets:', updatedExercise?.sets?.length);
+        
+        // Force change detection
+        this.changeDetector.markForCheck();
+        
+        this.showToast('Set added');
+      },
+      error: (error: any) => {
+        console.error('Error adding set:', error);
+        this.showToast('Failed to add set');
       }
-      return normalCount.toString();
-    }
+    });
+  }
+
+  // Add missing method for onWeightChange
+  onWeightChange(set: ExerciseSet, weight: number) {
+    if (!set.exerciseSetId) return;
     
-    switch (set.type) {
-      case SetType.WARMUP:
-        return 'W';
-      case SetType.DROPSET:
-        return 'D';
-      case SetType.FAILURE:
-        return 'F';
-      default:
-        return '';
-    }
+    // Update in service
+    this.activeWorkoutService.updateSetWeight(set.exerciseSetId, weight);
   }
 
-  getPreviousSetDisplay(exercise: Exercise, currentIndex: number): string {
-    const prevSet = this.getPreviousSet(exercise, currentIndex);
-    if (prevSet) {
-      return `${prevSet.weight}kg x ${prevSet.reps}`;
-    }
-    return '-';
+  // Add missing method for onRepsChange
+  onRepsChange(set: ExerciseSet, reps: number) {
+    if (!set.exerciseSetId) return;
+    
+    // Update in service
+    this.activeWorkoutService.updateSetReps(set.exerciseSetId, reps);
   }
 
-  getRestTimeDisplay(seconds: number): string {
+  // Add missing method for onSetTypeChange
+  onSetTypeChange(sets: ExerciseSet[] | undefined, setIndex: number): void {
+    if (!sets || setIndex < 0 || setIndex >= sets.length) return;
+    
+    const set = sets[setIndex];
+    if (!set || !set.exerciseSetId) return;
+    
+    // Update in service
+    this.activeWorkoutService.updateSetType(set.exerciseSetId, set.type);
+  }
+
+  // Add missing method for getRestTimeDisplay
+    getRestTimeDisplay(seconds: number): string {
     if (seconds === 0) {
       return 'Off';
     } else if (seconds < 60) {
@@ -667,93 +914,225 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     }
   }
 
-  onSetTypeChange(sets: ExerciseSet[] | undefined, setIndex: number): void {
-    if (!sets) return;
-    const set = sets[setIndex];
+  // Add missing method for getNormalSetNumber
+  getNormalSetNumber(sets: ExerciseSet[] | undefined, index: number): string {
+    if (!sets) return "1";
     
-    if (!set.exerciseSetId) return;
-    
-    // Update the UI immediately
-    for (let exerciseIndex = 0; exerciseIndex < this.exercises.length; exerciseIndex++) {
-      const exercise = this.exercises[exerciseIndex];
-      if (exercise.sets === sets) {
-        this.exercises[exerciseIndex] = {
-          ...exercise,
-          sets: [...(exercise.sets || [])]
-        };
-        
-        this.exercises = [...this.exercises];
-        this.changeDetector.detectChanges();
-        break;
-      }
-    }
-    
-    // Save to service
-    this.activeWorkoutService.updateSetType(set.exerciseSetId, set.type);
-  }
-
-  // Add these methods to handle input changes
-  onWeightChange(set: ExerciseSet, newWeight: number | undefined): void {
-    if (!set.exerciseSetId) return;
-    const weight = newWeight ?? 0;
-    
-    // Update UI
-    set.weight = weight;
-    
-    // Update service and save
-    this.activeWorkoutService.updateSetWeight(set.exerciseSetId, weight);
-  }
-
-  onRepsChange(set: ExerciseSet, newReps: number | undefined): void {
-    if (!set.exerciseSetId) return;
-    const reps = newReps ?? 0;
-    
-    // Update UI
-    set.reps = reps;
-    
-    // Update service and save  
-    this.activeWorkoutService.updateSetReps(set.exerciseSetId, reps);
-  }
-
-  getNormalSetNumber(sets: ExerciseSet[] | undefined, currentIndex: number): number {
-    if (!sets) return 1;
-    
+    // Count how many normal sets came before this one
     let normalSetCount = 0;
-    for (let i = 0; i <= currentIndex; i++) {
-      if (sets[i].type === SetType.NORMAL) {
+    for (let i = 0; i <= index; i++) {
+      if (i < sets.length && sets[i].type === SetType.NORMAL) {
         normalSetCount++;
       }
     }
-    return normalSetCount;
+    return normalSetCount.toString();
   }
 
-  startEmptyWorkout() {
-    this.router.navigate(['/active-workout/empty']);
-  }
-
-  getCurrentWorkoutDuration(): string {
-    const seconds = this.elapsedTime;
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    
-    return `PT${hours}H${minutes}M${remainingSeconds}S`;
-  }
-
-  // Add this method to check completion status
-  isSetCompleted(setId: string | undefined): Observable<boolean> {
-    if (!setId) return of(false);
-    
-    // Get the current state of all completed sets from the service
-    return this.activeWorkoutService.getSetCompletionStatus(setId);
-  }
-
+  // Add missing method
   ngOnDestroy() {
     this.stopTimer();
-    if (this.workoutActive && !this.isCompleting) {
-    console.log('Component destroyed while workout active - pausing workout');
-    this.activeWorkoutService.pauseWorkout();
+    if (this.workoutSubscription) {
+      this.workoutSubscription.unsubscribe();
+    }
   }
+
+  // Add the startEmptyWorkout method to match the HTML
+  startEmptyWorkout(): void {
+    if (!this.workout) {
+      // Create a new empty workout
+      const emptyWorkout: ActiveWorkout = {
+        name: 'Empty Workout',
+        startTime: new Date().toISOString(),
+        workoutId: `temp-${Date.now()}`
+      };
+      
+      this.workout = emptyWorkout;
+      this.exercises = [];
+      this.workoutActive = true;
+      this.isPaused = false;
+      
+      // Start the workout in the service
+      this.activeWorkoutService.startWorkout(emptyWorkout).subscribe({
+        next: () => {
+          this.startTimer();
+          this.showToast('Empty workout started');
+        },
+        error: (error) => {
+          console.error('Error starting empty workout:', error);
+          this.showToast('Failed to start empty workout');
+        }
+      });
+    }
+  }
+
+  // Add this method to handle the options menu click
+  async showExerciseOptions(exercise: Exercise) {
+    if (!exercise) return;
+    
+    const actionSheet = await this.actionSheetController.create({
+      header: exercise.name,
+      buttons: [
+        {
+          text: 'Delete Exercise',
+          role: 'destructive',
+          icon: 'trash',
+          handler: () => {
+            // Show a confirmation alert before deleting
+            this.confirmDeleteExercise(exercise);
+          }
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          icon: 'close'
+        }
+      ]
+    });
+    
+    await actionSheet.present();
+  }
+
+  // Add this helper method for confirmation
+  async confirmDeleteExercise(exercise: Exercise) {
+    if (!exercise || !exercise.exerciseId) return;
+    
+    const alert = await this.alertController.create({
+      header: 'Delete Exercise',
+      message: `Are you sure you want to remove ${exercise.name} from this workout?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.removeExercise(exercise);
+          }
+        }
+      ]
+    });
+    
+    await alert.present();
+  }
+
+  // Method to remove an exercise
+  async removeExercise(exercise: Exercise) {
+    if (!exercise || !exercise.exerciseId || !this.workout?.workoutId) return;
+    
+    try {
+      // Show loading indicator
+      const loading = await this.loadingController.create({
+        message: 'Deleting exercise...',
+        duration: 3000
+      });
+      await loading.present();
+      
+      // Check if the exercise has a temporary ID (not yet persisted to backend)
+      if (exercise.exerciseId.startsWith('temp-')) {
+        // Just remove it from the local array
+        this.exercises = this.exercises.filter(ex => ex.exerciseId !== exercise.exerciseId);
+        this.showToast(`Removed ${exercise.name}`);
+        this.changeDetector.markForCheck();
+        loading.dismiss();
+        return;
+      }
+      
+      // Otherwise call the service to delete the exercise
+      this.activeWorkoutService.removeExerciseFromWorkout(
+        this.workout.workoutId,
+        exercise.exerciseId
+      ).subscribe({
+        next: (updatedExercises: Exercise[]) => {
+          // Update exercises array
+          this.exercises = updatedExercises;
+          this.showToast(`Removed ${exercise.name}`);
+          this.changeDetector.markForCheck();
+          loading.dismiss();
+        },
+        error: (error) => {
+          console.error('Error removing exercise:', error);
+          this.showToast('Failed to remove exercise');
+          loading.dismiss();
+        }
+      });
+    } catch (error) {
+      console.error('Error in removeExercise:', error);
+      this.showToast('An unexpected error occurred');
+    }
+  }
+
+  // Method to remove a set from an exercise
+  async removeSet(exercise: Exercise, setIndex: number) {
+    if (!exercise || !exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
+    
+    const set = exercise.sets[setIndex];
+    if (!set) return;
+    
+    // Don't allow removing the last set
+    if (exercise.sets.length <= 1) {
+      this.showToast('Cannot remove the last set');
+      return;
+    }
+    
+    // Show confirmation
+    const alert = await this.alertController.create({
+      header: 'Delete Set',
+      message: 'Are you sure you want to delete this set?',
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            this.performSetDeletion(exercise, set, setIndex);
+          }
+        }
+      ]
+    });
+    
+    await alert.present();
+  }
+
+  // Helper method to perform the actual deletion
+  private performSetDeletion(exercise: Exercise, set: ExerciseSet, setIndex: number) {
+    // Handle temporary sets (not yet saved to backend)
+    if (!set.exerciseSetId || set.exerciseSetId.startsWith('temp-')) {
+      // Just remove from the local array
+      exercise.sets?.splice(setIndex, 1);
+      
+      // Update order positions
+      exercise.sets?.forEach((s, idx) => {
+        s.orderPosition = idx + 1;
+      });
+      
+      this.showToast('Set removed');
+      this.changeDetector.markForCheck();
+      return;
+    }
+    
+    // For sets with real IDs, use the service
+    if (!exercise.exerciseId || !set.exerciseSetId) return;
+    
+    this.activeWorkoutService.removeSetFromExercise(
+      exercise.exerciseId, 
+      set.exerciseSetId
+    ).subscribe({
+      next: (updatedExercises: Exercise[]) => {
+        // Update the exercises array
+        this.exercises = updatedExercises;
+        this.showToast('Set removed');
+        this.changeDetector.markForCheck();
+      },
+      error: (error) => {
+        console.error('Error removing set:', error);
+        this.showToast('Failed to remove set');
+      }
+    });
   }
 }
 

@@ -32,12 +32,14 @@ export class WorkoutPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.loadWorkouts();
+    console.log('WorkoutPage: Initializing');
+    this.loadWorkouts(); // Initial load
     
-    // Subscribe to refresh events
+    // Subscribe to refresh events with clear debug logging
     this.subscription.add(
       this.workoutService.workoutsRefresh$.subscribe(() => {
-        console.log('Workouts refresh event received');
+        console.log('WorkoutPage: Refresh event received, reloading workouts');
+        this.resetCaches(); // Add a method to clear all caches
         this.loadWorkouts();
       })
     );
@@ -47,18 +49,28 @@ export class WorkoutPage implements OnInit, OnDestroy {
     this.subscription.unsubscribe();
   }
 
+  // Add this method to reset all caches
+  private resetCaches() {
+    console.log('WorkoutPage: Resetting all caches');
+    this.exercisesCache.clear();
+    this.workoutExercises.clear();
+  }
+
   loadWorkouts() {
+    console.log('WorkoutPage: Loading workouts');
     this.isLoading = true;
-    this.justLoaded = true; // Modify loadWorkouts
+    this.justLoaded = true;
     
     // Set a timeout to reset the flag after 500ms
     setTimeout(() => this.justLoaded = false, 500);
     
     this.workoutService.getWorkoutsWithExercises().subscribe({
       next: (workoutsWithExercises) => {
+        console.log('WorkoutPage: Workouts loaded successfully', workoutsWithExercises.length);
         this.workouts = workoutsWithExercises.map(item => item.workout);
         
-        this.workoutExercises.clear();
+        // Reset and rebuild the exercise maps
+        this.resetCaches();
         workoutsWithExercises.forEach(item => {
           if (item.workout.workoutId) {
             this.workoutExercises.set(item.workout.workoutId, item.exercises || []);
@@ -68,6 +80,7 @@ export class WorkoutPage implements OnInit, OnDestroy {
         this.isLoading = false;
       },
       error: (error) => {
+        console.error('WorkoutPage: Failed to load workouts', error);
         this.showToast('Failed to load workouts');
         this.isLoading = false;
       }
@@ -172,9 +185,34 @@ export class WorkoutPage implements OnInit, OnDestroy {
     await toast.present();
   }
 
+  // Modify ionViewWillEnter to be more robust
   ionViewWillEnter() {
-    if (!this.justLoaded) { // Update ionViewWillEnter
+    console.log('WorkoutPage: View entering, justLoaded =', this.justLoaded);
+    
+    // Check if workouts are empty or if we haven't just loaded
+    if (this.workouts.length === 0 || !this.justLoaded) {
+      console.log('WorkoutPage: Need to reload workouts on view enter');
       this.loadWorkouts();
+    } else {
+      console.log('WorkoutPage: Skipping reload since workouts were just loaded');
     }
+  }
+  
+  // Add a manual refresh handler
+  doRefresh(event: any) {
+    console.log('WorkoutPage: Manual refresh triggered');
+    this.resetCaches();
+    this.workoutService.refreshWorkouts().subscribe({
+      next: () => {
+        // Now call load workouts directly instead of relying on the subscription
+        this.loadWorkouts();
+        event.target.complete();
+      },
+      error: (error) => {
+        console.error('Error refreshing workouts', error);
+        event.target.complete();
+        this.showToast('Failed to refresh workouts');
+      }
+    });
   }
 }

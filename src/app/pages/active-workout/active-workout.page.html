@@ -68,7 +68,7 @@
           </div>
           <div class="exercise-title">{{ exercise.name }}</div>
           <div class="exercise-options">
-            <ion-button fill="clear">
+            <ion-button fill="clear" (click)="showExerciseOptions(exercise)">
               <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
             </ion-button>
           </div>
@@ -121,62 +121,65 @@
             <div class="reps-col">REPS</div>
             <div class="completed-col">DONE</div>
           </div>
-            
-          <!-- Exercise Sets -->
-          <div *ngFor="let set of exercise.sets; let setIndex = index" class="set-row">
-            <div class="set-col">
-              <ion-select [(ngModel)]="set.type" 
-                [ngModelOptions]="{standalone: true}" 
-                [ngClass]="{
-                  'set-type-select': true,
-                  'warmup-type': set.type === SetType.WARMUP,
-                  'dropset-type': set.type === SetType.DROPSET,
-                  'failure-type': set.type === SetType.FAILURE,
-                  'normal-type': set.type === SetType.NORMAL
-                }"
-                interface="popover"
-                (ionChange)="onSetTypeChange(exercise.sets, setIndex)">
-                <ion-select-option [value]="SetType.NORMAL">{{ getNormalSetNumber(exercise.sets, setIndex) }}</ion-select-option>
-                <ion-select-option [value]="SetType.WARMUP">W</ion-select-option>
-                <ion-select-option [value]="SetType.DROPSET">D</ion-select-option>
-                <ion-select-option [value]="SetType.FAILURE">F</ion-select-option>
-              </ion-select>
-            </div>
-            <div class="kg-col">
-              <ion-item class="input-item">
-                <!-- For weight input -->
-<ion-input
-  type="number"
-  [(ngModel)]="set.weight"
-  (ionChange)="onWeightChange(set, set.weight || 0)"
-  inputmode="decimal"
-  min="0"
-  placeholder="0">
-</ion-input>
-              </ion-item>
-            </div>
-            <div class="reps-col">
-              <ion-item class="input-item">
-                <!-- For reps input -->
-<ion-input
-  type="number"
-  [(ngModel)]="set.reps"
-  (ionChange)="onRepsChange(set, set.reps || 0)"
-  inputmode="numeric"
-  min="0"
-  placeholder="0">
-</ion-input>
-              </ion-item>
-            </div>
-            <div class="completed-col">
-              <ion-checkbox 
-                [checked]="isSetCompleted(set.exerciseSetId) | async" 
-                (ionChange)="toggleSetComplete(set)">
-              </ion-checkbox>
-            </div>
-          </div>
           
-          <!-- Add Set Button -->
+          <!-- Simplified structure with fewer nested elements -->
+          <ion-item-sliding *ngFor="let set of exercise.sets; let setIndex = index">
+            <div class="set-row-wrapper">
+              <ion-item lines="none" class="set-row">
+                <!-- Set type -->
+                <ion-select slot="start" class="set-col set-type-select"
+                  [(ngModel)]="set.type" 
+                  [ngModelOptions]="{standalone: true}" 
+                  [ngClass]="{
+                    'warmup-type': set.type === SetType.WARMUP,
+                    'dropset-type': set.type === SetType.DROPSET,
+                    'failure-type': set.type === SetType.FAILURE,
+                    'normal-type': set.type === SetType.NORMAL
+                  }"
+                  interface="popover"
+                  (ionChange)="onSetTypeChange(exercise.sets, setIndex)">
+                  <ion-select-option [value]="SetType.NORMAL">{{ getNormalSetNumber(exercise.sets, setIndex) }}</ion-select-option>
+                  <ion-select-option [value]="SetType.WARMUP">W</ion-select-option>
+                  <ion-select-option [value]="SetType.DROPSET">D</ion-select-option>
+                  <ion-select-option [value]="SetType.FAILURE">F</ion-select-option>
+                </ion-select>
+                
+                <!-- Weight -->
+                <ion-input slot="start" class="kg-col"
+                  type="number"
+                  [(ngModel)]="set.weight"
+                  (ionChange)="onWeightChange(set, set.weight || 0)"
+                  inputmode="decimal"
+                  min="0"
+                  placeholder="0">
+                </ion-input>
+                
+                <!-- Reps -->
+                <ion-input slot="start" class="reps-col"
+                  type="number"
+                  [(ngModel)]="set.reps"
+                  (ionChange)="onRepsChange(set, set.reps || 0)"
+                  inputmode="numeric"
+                  min="0"
+                  placeholder="0">
+                </ion-input>
+                
+                <!-- Checkbox -->
+                <ion-checkbox slot="end" class="completed-col set-completion-checkbox"
+                  [checked]="set.completed" 
+                  (ionChange)="toggleSetComplete(set)">
+                </ion-checkbox>
+              </ion-item>
+              
+              <!-- Swipe options remain the same -->
+              <ion-item-options side="end">
+                <ion-item-option color="danger" (click)="removeSet(exercise, setIndex)">
+                  <ion-icon slot="icon-only" name="trash"></ion-icon>
+                </ion-item-option>
+              </ion-item-options>
+            </div>
+          </ion-item-sliding>
+          
           <button class="add-set-button" (click)="addSet(exercise)">
             <ion-icon name="add-circle-outline"></ion-icon>
             Add Set
@@ -202,6 +205,85 @@
             Complete Workout
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise Library Modal -->
+  <div class="exercise-library-overlay" *ngIf="showExerciseLibrary">
+    <div class="exercise-library">
+      <div class="library-header">
+        <div class="library-title">Exercise Library</div>
+        <ion-button fill="clear" (click)="closeLibrary()" class="close-button">
+          <ion-icon name="close-outline"></ion-icon>
+        </ion-button>
+      </div>
+      
+      <div class="search-bar">
+        <ion-icon name="search-outline"></ion-icon>
+        <ion-searchbar
+          [(ngModel)]="searchTerm"
+          (ionChange)="onSearch($event)"
+          placeholder="Search exercises"
+          animated>
+        </ion-searchbar>
+      </div>
+      
+      <div class="library-filters">
+        <ion-select
+          [(ngModel)]="selectedEquipment"
+          (ionChange)="filterExercises()"
+          placeholder="All Equipment"
+          interface="popover">
+          <ion-select-option value="All Equipment">All Equipment</ion-select-option>
+          <ion-select-option value="Barbell">Barbell</ion-select-option>
+          <ion-select-option value="Dumbbell">Dumbbell</ion-select-option>
+          <ion-select-option value="Bodyweight">Bodyweight</ion-select-option>
+          <ion-select-option value="Machine">Machine</ion-select-option>
+        </ion-select>
+        
+        <ion-select
+          [(ngModel)]="selectedMuscleGroup"
+          (ionChange)="filterExercises()"
+          placeholder="All Muscles"
+          interface="popover">
+          <ion-select-option value="All Muscles">All Muscles</ion-select-option>
+          <ion-select-option value="Chest">Chest</ion-select-option>
+          <ion-select-option value="Back">Back</ion-select-option>
+          <ion-select-option value="Shoulders">Shoulders</ion-select-option>
+          <ion-select-option value="Legs">Legs</ion-select-option>
+          <ion-select-option value="Arms">Arms</ion-select-option>
+        </ion-select>
+      </div>
+      
+      <div *ngIf="isLoading" class="library-loading">
+        <ion-spinner></ion-spinner>
+        <p>Loading exercises...</p>
+      </div>
+      
+      <div class="exercise-list-container" *ngIf="!isLoading">
+        <div *ngFor="let template of filteredTemplates" class="exercise-item" (click)="addExerciseFromTemplate(template)">
+          <div class="exercise-item-avatar">
+            <img src="assets/exercise-icons/barbell.png" alt="Exercise">
+          </div>
+          <div class="exercise-item-details">
+            <div class="exercise-item-name">{{ template.name }}</div>
+            <div class="exercise-item-target">{{ template.targetMuscleGroups?.join(", ") }}</div>
+          </div>
+          <ion-button fill="clear" class="add-exercise-btn">
+            <ion-icon name="add"></ion-icon>
+          </ion-button>
+        </div>
+        
+        <div *ngIf="filteredTemplates.length === 0" class="no-results">
+          <p>No exercises found matching your criteria</p>
+        </div>
+      </div>
+      
+      <div class="library-footer">
+        <ion-button expand="block" (click)="closeLibrary()" class="done-button">
+          Done
+        </ion-button>
       </div>
     </div>
   </div>

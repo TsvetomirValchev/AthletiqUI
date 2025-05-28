@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, throwError, of } from 'rxjs';
+import { Observable, throwError, of, Subject } from 'rxjs';
 import { catchError, map, tap, switchMap, timeout } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { ActiveWorkout } from '../models/active-workout.model';
@@ -27,6 +27,9 @@ export interface WorkoutStatistics {
 })
 export class WorkoutHistoryService {
   private apiUrl = `${environment.apiUrl}/workouts/history`;
+  private workoutHistoryCache: WorkoutHistory[] | null = null;
+  private historyRefreshSubject = new Subject<void>();
+  public historyRefresh$ = this.historyRefreshSubject.asObservable();
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 
@@ -96,40 +99,53 @@ export class WorkoutHistoryService {
       }
     });
     
-    // Use the duration and elapsed time that was provided by the component
-    console.log(`Using provided workout duration: ${workout.duration}`);
-    const durationInSeconds = workout.duration || 0;
-    
     // Format current date as YYYY-MM-DD
-    const currentDate = new Date().toISOString().split('T')[0]; 
+    const currentDate = new Date().toISOString().split('T')[0];
     
-    // Create payload for the API with required fields
+    // Clean up exercises and map to the format expected by the backend
+    // Important: Don't filter out temp exercises/sets since they're valid data
+    // Just ensure they have proper format for the backend
+    const cleanedExercises = exercises
+      // Don't filter by exerciseId - include all exercises
+      .map((exercise, index) => ({
+        exerciseName: exercise.name || 'Exercise',
+        orderPosition: index + 1, 
+        notes: exercise.notes || '',
+        exerciseSetHistories: (exercise.sets || [])
+          // Don't filter by exerciseSetId - include all sets 
+          .map((set, setIndex) => ({
+            orderPosition: setIndex + 1,
+            reps: set.reps || 0,
+            weight: set.weight || 0,
+            completed: set.completed || false, // Make sure to preserve the completed state
+            type: set.type || 'NORMAL'
+          }))
+      }));
+    
+    // Create payload for the API
     const payload = {
       userId: workout.userId || localStorage.getItem('userId'),
       name: workout.name || 'Workout',
       date: currentDate,
-      duration: workout.duration, // Use the provided duration directly
-      completedAt: new Date().toISOString(),
-      exerciseHistories: exercises.map((exercise, index) => ({
-        exerciseName: exercise.name || 'Exercise',
-        orderPosition: index + 1,
-        notes: exercise.notes || '',
-        exerciseSetHistories: exercise.sets?.map((set, setIndex) => ({
-          orderPosition: set.orderPosition || setIndex + 1,
-          reps: set.reps || 0,
-          weight: set.weight || 0,
-          completed: set.completed || false,
-          type: set.type || 'NORMAL'
-        })) || []
-      }))
+      duration: workout.duration,
+      exerciseHistories: cleanedExercises
     };
     
-    console.log(`Saving workout history with duration: ${workout.duration} (${durationInSeconds}s)`);
+    console.log('Sending workout history payload:', JSON.stringify(payload, null, 2));
     
-    // Send the workout to the backend
+    // Update the sequence of operations in the ActiveWorkoutPage's finishWorkout method
+    // First clear the session, then send to backend
     return this.http.post<any>(`${this.apiUrl}`, payload).pipe(
       tap(response => {
         console.log('Workout completed and saved to history successfully:', response);
+        
+        // Store the created history ID for reference
+        if (response && response.workoutHistoryId) {
+          localStorage.setItem('lastCompletedWorkoutId', response.workoutHistoryId);
+        }
+        
+        // Force refresh the history data after saving
+        this.refreshHistory();
       }),
       catchError(error => {
         console.error('Error completing workout:', error);
@@ -140,9 +156,27 @@ export class WorkoutHistoryService {
     );
   }
   /**
+   * Force refresh workout history data
+   */
+  public refreshHistory(): void {
+    console.log('Forcing refresh of workout history');
+    // Clear any cached data
+    this.workoutHistoryCache = null;
+    
+    // Emit the event to notify subscribers
+    this.historyRefreshSubject.next();
+  }
+
+  /**
    * Get all workout history items for the current user
    */
   public getWorkoutHistory(): Observable<WorkoutHistory[]> {
+    // If we have a cached result and no refresh is requested, return it
+    if (this.workoutHistoryCache) {
+      console.log('Returning cached workout history');
+      return of(this.workoutHistoryCache);
+    }
+    
     return this.authService.currentUser$.pipe(
       switchMap(user => {
         if (!user || !user.userId) {
@@ -159,6 +193,8 @@ export class WorkoutHistoryService {
             // Check the first item to see its structure
             if (response && response.length > 0) {
               console.log('First workout object keys:', Object.keys(response[0]));
+              // Log the createdAt timestamp to verify it's coming from the backend
+              console.log('First workout createdAt:', response[0].createdAt);
             }
           }),
           map(history => {
@@ -167,17 +203,21 @@ export class WorkoutHistoryService {
               return [];
             }
             
-            // Map each item ensuring ID is preserved
-            return history.map(item => {
+            // Map each item ensuring ID and createdAt are preserved
+            const mappedHistory = history.map(item => {
               if (!item) return null;
-              console.log('Individual workout item:', item);
+              
               return {
                 ...item,
                 workoutHistoryId: item.workoutHistoryId || item.id || null,
+                createdAt: item.createdAt || null, // Ensure createdAt is preserved
               };
             }).filter(item => item !== null) as WorkoutHistory[];
+
+            // Cache the result and sort by createdAt timestamp
+            this.workoutHistoryCache = this.sortWorkoutHistory(mappedHistory);
+            return this.workoutHistoryCache;
           }),
-          map(history => this.sortWorkoutHistory(history)),
           catchError(error => {
             console.error('Error fetching workout history:', error);
             return of([]);
@@ -393,10 +433,18 @@ export class WorkoutHistoryService {
   }
 
   /**
-   * Sort workout history by date (newest first)
+   * Sort workout history by creation timestamp (newest first)
    */
   private sortWorkoutHistory(history: WorkoutHistory[]): WorkoutHistory[] {
     return [...history].sort((a, b) => {
+      // First try to use createdAt timestamp
+      if (a.createdAt && b.createdAt) {
+        const dateA = new Date(a.createdAt);
+        const dateB = new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      }
+      
+      // Fall back to date field if createdAt is not available
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       return dateB.getTime() - dateA.getTime();

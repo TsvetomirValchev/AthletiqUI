@@ -7,4 +7,5 @@ export interface WorkoutHistory {
     date: string;
     duration: string;
     exerciseHistories?: ExerciseHistory[];
+    createdAt?: string;
 }
