@@ -10,47 +10,7 @@
   --button-warning: #ffc107;
 }
 
-.input-item {
-  --inner-padding-end: 0;
-  --inner-padding-start: 0;
-  --padding-start: 0;
-  --padding-end: 0;
-  --border-style: none;
-  --highlight-color-focused: transparent;
-  --highlight-height: 0;
-  --background: transparent;
-}
-
-ion-checkbox {
-    --checkbox-background-checked: var(--button-green)
-}
- 
-
-ion-input {
-    --background: #1e1e1e;
-    --color: white;
-    --padding-start: 8px;
-    --padding-end: 8px;
-    --placeholder-color: #666;
-    --placeholder-opacity: 1;
-    text-align: center;
-    min-height: 36px;
-    font-size: 16px;
-    margin: 0;
-
-    // No borders on small screens (phones)
-    @media (max-width: 768px) {
-        --border-width: 0;
-        border: none;
-    }
-
-    // Show borders on larger screens (PCs)
-    @media (min-width: 769px) {
-        border: 1px solid #444;
-        border-radius: 4px;
-    }
-}
-
+// Base styles
 .create-routine-page {
   --background: #121212;
   --color: white;
@@ -58,37 +18,18 @@ ion-input {
 }
 
 // Header with timer
-ion-header {
-  ion-toolbar {
-    --background: #000;
-    --color: #fff;
-    
-    ion-title {
-      font-size: 16px;
-      font-weight: bold;
-      text-align: center;
-    }
-    
-    ion-button {
-      --color: #fff;
-      font-weight: bold;
-    }
-
-    .timer-display-header {
-      position: absolute;
-      right: 60px;
-      font-family: monospace;
-      font-size: 16px;
-      font-weight: bold;
-      color: #28a745;
-    }
+ion-header ion-toolbar {
+  --background: #000;
+  --color: #fff;
+  
+  .timer-display-header {
+    position: absolute;
+    right: 60px;
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+    color: #28a745;
   }
-}
-
-// Content styling
-ion-content {
-  --background: var(--background-color);
-  --color: var(--text-color);
 }
 
 // Timer controls container
@@ -98,25 +39,6 @@ ion-content {
   padding: 16px;
   background-color: rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid #333;
-}
-
-.timer-controls {
-  display: flex;
-  gap: 10px;
-  
-  .pause-button {
-    --background: #ffc107;
-    --color: #000;
-    font-weight: bold;
-    min-width: 120px;
-  }
-  
-  .resume-button {
-    --background: #28a745;
-    --color: #000;
-    font-weight: bold;
-    min-width: 120px;
-  }
 }
 
 // Main container layout
@@ -132,7 +54,7 @@ ion-content {
   padding: 0 16px 20px;
 }
 
-// Exercise cards
+// Exercise card styling
 .exercise-card {
   background-color: #1e1e1e;
   border-radius: 10px;
@@ -144,43 +66,63 @@ ion-content {
 .exercise-header {
   display: flex;
   align-items: center;
-  background-color: #1e1e1e;
   padding: 10px;
   border-radius: 8px 8px 0 0;
-}
-
-.exercise-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  margin-right: 12px;
-  background: #333;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  
+  .exercise-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 12px;
+    background: #333;
+  }
+  
+  .exercise-title {
+    flex-grow: 1;
+    font-weight: bold;
+    font-size: 16px;
   }
 }
 
-.exercise-title {
-  flex-grow: 1;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.exercise-options {
-  ion-button {
-    --color: #aaa;
-    --padding-start: 8px;
-    --padding-end: 8px;
+// Add styles for the reorder handle
+.exercise-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  color: #666;
+  padding: 0 8px;
+  
+  &:active {
+    cursor: grabbing;
+  }
+  
+  ion-reorder {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  ion-icon {
+    font-size: 24px;
   }
 }
 
-// Notes section
-.notes-section,
-.timer-section {
+// Reorder animation styles
+ion-reorder-group {
+  width: 100%;
+}
+
+.reorder-selected {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  opacity: 0.8;
+  z-index: 100;
+}
+
+// Notes and timer sections
+.notes-section, .timer-section {
   padding: 16px;
   border-bottom: 1px solid #333;
 }
@@ -203,106 +145,56 @@ ion-content {
   font-size: 14px;
 }
 
-// Timer section
-.timer-select {
-  background-color: #252525;
-  border: none;
-  border-radius: 5px;
-  color: white;
-  padding: 8px 12px;
-  width: 100%;
-  max-width: 200px;
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-  background-position: right 12px center;
-  background-repeat: no-repeat;
-  padding-right: 32px;
-}
-
 // Sets section
 .sets-section {
   padding: 16px;
 }
 
+// Sets header
 .sets-header {
   display: flex;
   margin-bottom: 10px;
   font-size: 12px;
   color: #aaa;
   font-weight: bold;
+  
+  .set-col { width: 40px; text-align: center; }
+  .kg-col, .reps-col { flex: 1; text-align: center; }
+  .completed-col { width: 40px; text-align: center; }
+  .remove-col { width: 40px; text-align: center; }
 }
 
-// Individual rows for sets
+// Set rows
 .set-row {
   display: flex;
   align-items: center;
   margin-bottom: 8px;
   height: 36px;
-  background-color: transparent;
   
-  &.completed-set {
-    background-color: rgba(76, 175, 80, 0.1);
+  .set-col { 
+    width: 40px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .kg-col, .reps-col { 
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+  
+  .completed-col, .remove-col { 
+    width: 40px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
-// Column for set type
-.set-col {
-  width: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.prev-col {
-  width: 50px;
-  color: #aaa;
-  font-size: 12px;
-  text-align: center;
-}
-
-// Columns for weight and reps
-.kg-col, .reps-col {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-
-  ion-input {
-    --background: #1e1e1e;
-    --color: white;
-    --padding-start: 8px;
-    --padding-end: 8px;
-    --placeholder-color: #666;
-    --placeholder-opacity: 1;
-    text-align: center;
-    min-height: 36px;
-    font-size: 16px;
-    margin: 0;
-
-    // No borders on small screens (phones)
-    @media (max-width: 768px) {
-      --border-width: 0;
-      border: none;
-    }
-
-    // Show borders on larger screens (PCs)
-    @media (min-width: 769px) {
-      border: 1px solid #444;
-      border-radius: 4px;
-    }
-  }
-}
-
-// Column for completion checkbox
-.completed-col {
-  width: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-// Set type selector styling
+// Set type selector
 .set-type-select {
   width: 36px;
   height: 36px;
@@ -310,21 +202,15 @@ ion-content {
   background-color: #1e1e1e;
   color: white;
   text-align: center;
-
-  // No borders on small screens (phones)
-  @media (max-width: 768px) {
-    border: none;
-  }
-
-  // Show borders on larger screens (PCs)
+  
   @media (min-width: 769px) {
     border: 1px solid #444;
   }
-
+  
   &::part(icon) {
     display: none;
   }
-
+  
   &::part(text) {
     position: absolute;
     left: 50%;
@@ -337,25 +223,13 @@ ion-content {
     align-items: center;
     font-weight: bold;
   }
+  
+  &.warmup-type { color: #ffa726; }
+  &.dropset-type { color: #7e57c2; }
+  &.failure-type { color: #ef5350; }
 }
 
-.warmup-type {
-  color: #ffa726;
-}
-
-.dropset-type {
-  color: #7e57c2;
-}
-
-.failure-type {
-  color: #ef5350;
-}
-
-.normal-type {
-  color: white;
-}
-
-// Fix ion-item styling for inputs
+// Input styling
 .input-item {
   --background: transparent;
   --padding-start: 0;
@@ -365,14 +239,31 @@ ion-content {
   --border-width: 0;
   --min-height: 36px;
   margin: 0;
-
+  
   &::part(native) {
     padding: 0;
     min-height: 36px;
   }
 }
 
-// Custom ion-checkbox styles
+ion-input {
+  --background: #1e1e1e;
+  --color: white;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --placeholder-color: #666;
+  text-align: center;
+  min-height: 36px;
+  font-size: 16px;
+  margin: 0;
+  
+  @media (min-width: 769px) {
+    border: 1px solid #444;
+    border-radius: 4px;
+  }
+}
+
+// Checkbox styling
 ion-checkbox.set-completion-checkbox {
   --size: 22px;
   --border-radius: 4px;
@@ -382,7 +273,21 @@ ion-checkbox.set-completion-checkbox {
   --border-color: #aaa;
 }
 
-// Add Set button styling
+// Remove button
+.remove-button {
+  background: none;
+  border: none;
+  color: red;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
+}
+
+// Add set button
 .add-set-button {
   background-color: transparent;
   color: #0086ff;
@@ -394,24 +299,18 @@ ion-checkbox.set-completion-checkbox {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-
-  // No borders on small screens (phones)
-  @media (max-width: 768px) {
-    border: none;
-  }
-
-  // Show borders on larger screens (PCs)
+  
   @media (min-width: 769px) {
     border: 1px solid #444;
     border-radius: 4px;
   }
-
+  
   ion-icon {
     margin-right: 8px;
   }
 }
 
-// Add exercise button container
+// Add exercise button
 .add-exercise-button-container {
   margin-top: 16px;
   padding: 0 16px 16px;
@@ -420,7 +319,6 @@ ion-checkbox.set-completion-checkbox {
   justify-content: center;
 }
 
-// Style for the rectangular add exercise button
 .add-exercise-button {
   background-color: #007bff;
   color: white;
@@ -434,16 +332,7 @@ ion-checkbox.set-completion-checkbox {
   justify-content: center;
   width: 100%;
   cursor: pointer;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: #0069d9;
-  }
-
-  &:active {
-    background-color: #0062cc;
-  }
-
+  
   ion-icon {
     margin-right: 8px;
     font-size: 20px;
@@ -456,12 +345,6 @@ ion-checkbox.set-completion-checkbox {
   justify-content: space-between;
   gap: 12px;
   margin: 20px 16px;
-  
-  @media (min-width: 769px) {
-    width: 100%;
-    max-width: 500px;
-    margin: 20px auto;
-  }
   
   .save-button, .discard-button {
     flex: 1;
@@ -484,31 +367,17 @@ ion-checkbox.set-completion-checkbox {
     background-color: #007bff;
     color: white;
     border: none;
-    
-    &:hover {
-      background-color: #0069d9;
-    }
-    
-    &:disabled {
-      background-color: #cccccc;
-      color: #666666;
-      cursor: not-allowed;
-    }
   }
   
   .discard-button {
     background-color: transparent;
     color: #ff3b30;
     border: 1px solid #ff3b30;
-    
-    &:hover {
-      background-color: rgba(255, 59, 48, 0.1);
-    }
   }
 }
 
-// Empty state
-.empty-state-container {
+// Empty state and loading
+.empty-state-container, .loading-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -522,51 +391,16 @@ ion-checkbox.set-completion-checkbox {
     margin-bottom: 16px;
     color: #555;
   }
-
+  
   .empty-title {
     font-size: 18px;
     font-weight: 500;
     margin-bottom: 8px;
     color: white;
   }
-
-  .empty-subtitle {
-    font-size: 14px;
-    margin-bottom: 24px;
-  }
-
-  .add-first-exercise-btn {
-    --background: #007bff;
-    --background-activated: #0069d9;
-    --border-radius: 24px;
-    --padding-start: 20px;
-    --padding-end: 20px;
-    height: 48px;
-    font-weight: 500;
-    margin-top: 16px;
-  }
 }
 
-// Loading container
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 50vh;
-  padding: 20px;
-  
-  ion-spinner {
-    margin-bottom: 16px;
-  }
-  
-  p {
-    margin: 0;
-    color: #aaa;
-  }
-}
-
-// Exercise Library Overlay Styles
+// Exercise Library
 .exercise-library-overlay {
   position: fixed;
   top: 0;
@@ -589,213 +423,149 @@ ion-checkbox.set-completion-checkbox {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.library-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #333;
-}
-
-.library-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: white;
-}
-
-.close-button {
-  --color: #aaa;
-}
-
-.search-bar {
-  padding: 8px 16px;
-  border-bottom: 1px solid #333;
-}
-
-.library-filters {
-  padding: 8px 16px;
-  display: flex;
-  gap: 8px;
-  border-bottom: 1px solid #333;
   
-  ion-select {
-    background-color: #252525;
-    border-radius: 4px;
-    --padding-start: 8px;
-    --padding-end: 8px;
-    width: 50%;
-  }
-}
-
-.library-loading {
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #aaa;
-  
-  ion-spinner {
-    margin-bottom: 16px;
-  }
-}
-
-.exercise-list-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-}
-
-.exercise-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #2a2a2a;
-  cursor: pointer;
-  
-  &:hover {
-    background-color: #252525;
-  }
-}
-
-.exercise-item-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  margin-right: 12px;
-  background: #333;
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-}
-
-.exercise-item-details {
-  flex: 1;
-}
-
-.exercise-item-name {
-  font-weight: 500;
-  color: white;
-}
-
-.exercise-item-target {
-  font-size: 12px;
-  color: #aaa;
-  margin-top: 4px;
-}
-
-.add-exercise-btn {
-  --color: #007bff;
-  --padding-start: 8px;
-  --padding-end: 8px;
-}
-
-.no-results {
-  padding: 24px;
-  text-align: center;
-  color: #aaa;
-}
-
-.library-footer {
-  padding: 16px;
-  border-top: 1px solid #333;
-  
-  .done-button {
-    --background: #007bff;
-    --color: white;
-    font-weight: 500;
-  }
-}
-
-// Modify the ion-item-sliding styles at the end of your stylesheet
-ion-item-sliding {
-  background-color: transparent;
-  margin-bottom: 8px;  // Add bottom margin to match your original spacing
-  
-  ion-item {
-    --background: transparent;
-    --border-color: transparent;
-    --border-style: none;
-    --min-height: 36px;
-    --padding-start: 0;
-    --padding-end: 0;
-    --inner-padding-start: 0;
-    --inner-padding-end: 0;
-    margin: 0;
+  .library-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #333;
     
-    &::part(native) {
-      padding: 0;
+    .library-title {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .close-button {
+      --color: #aaa;
     }
   }
   
-  // Fix for checkbox alignment
-  .set-row {
+  .search-bar {
+    margin: 0 16px 16px;
+    background-color: #1e1e1e;
+    border-radius: 5px;
     display: flex;
     align-items: center;
-    width: 100%;
-    height: 36px;
-    padding: 0;
-    margin: 0;
+    padding: 0 12px;
     
-    // Make sure the columns maintain their widths
-    .set-col {
-      width: 40px;
-      min-width: 40px;
+    ion-icon {
+      color: #777;
+      margin-right: 8px;
     }
     
-    .kg-col, .reps-col {
-      flex: 1;
+    ion-searchbar {
+      padding: 0;
+      --background: transparent;
+      --color: white;
+      --placeholder-color: #666;
+      --icon-color: #777;
+      --clear-button-color: #777;
+      --box-shadow: none;
     }
+  }
+  
+  // Updated library filters - single filter only
+  .library-filters {
+    padding: 0 16px 16px;
+    display: flex;
     
-    .completed-col {
-      width: 80px;
-      min-width: 80px;
+    ion-select {
+      background-color: #1e1e1e;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      padding: 10px;
+      width: 100%;
+      --placeholder-color: #666;
+      --placeholder-opacity: 1;
+    }
+  }
+  
+  .exercise-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px;
+    
+    .exercise-item {
       display: flex;
-      justify-content: center;
       align-items: center;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
       
-      ion-checkbox {
-        margin: 0;
-        --size: 22px;
+      &:hover {
+        background-color: #252525;
+      }
+      
+      .exercise-item-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        margin-right: 12px;
+        background: #333;
+      }
+      
+      .exercise-item-details {
+        flex: 1;
+      }
+      
+      .exercise-item-name {
+        font-weight: 500;
+        color: white;
+      }
+      
+      .exercise-item-target {
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 4px;
+      }
+      
+      .add-exercise-btn {
+        --color: #007bff;
       }
     }
+    
+    .no-results {
+      text-align: center;
+      padding: 20px;
+      color: #aaa;
+    }
+  }
+  
+  .library-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #aaa;
+    
+    ion-spinner {
+      margin-bottom: 16px;
+    }
+  }
+  
+  .library-footer {
+    padding: 16px;
+    border-top: 1px solid #333;
+    
+    .done-button {
+      --background: #007bff;
+      --color: white;
+    }
   }
 }
 
-// Make sure the set headers align with the content
-.sets-header {
-  display: flex;
-  margin-bottom: 10px;
-  font-size: 12px;
-  color: #aaa;
-  font-weight: bold;
-  
-  // Ensure headers align with the content below
-  .set-col {
-    width: 40px;
-    min-width: 40px;
-    text-align: center;
-  }
-  
+// Mobile adjustments
+@media (max-width: 768px) {
   .kg-col, .reps-col {
-    flex: 1;
-    text-align: center;
+    padding: 0 2px;
   }
   
-  .completed-col {
-    width: 80px;
-    min-width: 80px;
-    text-align: center;
+  .set-col, .remove-col, .completed-col {
+    width: 36px;
   }
-}
-
-// Quick fix to align DONE header with checkbox
-.completed-col {
-  margin-right: 15px; // Adjust this value to move the DONE text to match the checkbox position
 }

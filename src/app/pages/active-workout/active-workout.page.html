@@ -60,77 +60,84 @@
         </ion-button>
       </div>
 
-      <!-- Exercise Cards -->
-      <div *ngFor="let exercise of exercises; let exerciseIndex = index" class="exercise-card">
-        <div class="exercise-header">
-          <div class="exercise-avatar">
-            <img src="assets/exercise-icons/barbell.png" alt="Exercise">
+      <!-- Exercise Cards - Add ion-reorder-group for drag-and-drop functionality -->
+      <ion-reorder-group (ionItemReorder)="reorderExercises($event)" disabled="false">
+        <div *ngFor="let exercise of exercises; let exerciseIndex = index" class="exercise-card">
+          <div class="exercise-header">
+            <div class="exercise-handle">
+              <ion-reorder>
+                <ion-icon name="reorder-four-outline"></ion-icon>
+              </ion-reorder>
+            </div>
+            <div class="exercise-avatar">
+              <img src="assets/exercise-icons/barbell.png" alt="Exercise">
+            </div>
+            <div class="exercise-title">{{ exercise.name }}</div>
+            <div class="exercise-options">
+              <ion-button fill="clear" (click)="showExerciseOptions(exercise)">
+                <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+              </ion-button>
+            </div>
           </div>
-          <div class="exercise-title">{{ exercise.name }}</div>
-          <div class="exercise-options">
-            <ion-button fill="clear" (click)="showExerciseOptions(exercise)">
-              <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
-            </ion-button>
+
+          <!-- Note Section -->
+          <div class="notes-section">
+            <div class="section-label">Note</div>
+            <textarea [(ngModel)]="exercise.notes" placeholder="Add pinned note" class="note-input"></textarea>
           </div>
-        </div>
 
-        <!-- Note Section -->
-        <div class="notes-section">
-          <div class="section-label">Note</div>
-          <textarea [(ngModel)]="exercise.notes" placeholder="Add pinned note" class="note-input"></textarea>
-        </div>
-
-        <!-- Rest Timer -->
-        <div class="timer-section">
-          <div class="section-label">Rest Timer:</div>
-          <ion-select 
-            [(ngModel)]="exercise.restTimeSeconds" 
-            [ngModelOptions]="{standalone: true}" 
-            interface="popover" 
-            [selectedText]="getRestTimeDisplay(exercise.restTimeSeconds || 0)">
-            <ion-select-option value="0">Off</ion-select-option>
-            <ion-select-option value="15">15s</ion-select-option>
-            <ion-select-option value="30">30s</ion-select-option>
-            <ion-select-option value="45">45s</ion-select-option>
-            <ion-select-option value="60">1m</ion-select-option>
-            <ion-select-option value="75">1m 15s</ion-select-option>
-            <ion-select-option value="90">1m 30s</ion-select-option>
-            <ion-select-option value="105">1m 45s</ion-select-option>
-            <ion-select-option value="120">2m</ion-select-option>
-            <ion-select-option value="135">2m 15s</ion-select-option>
-            <ion-select-option value="150">2m 30s</ion-select-option>
-            <ion-select-option value="165">2m 45s</ion-select-option>
-            <ion-select-option value="180">3m</ion-select-option>
-            <ion-select-option value="195">3m 15s</ion-select-option>
-            <ion-select-option value="210">3m 30s</ion-select-option>
-            <ion-select-option value="225">3m 45s</ion-select-option>
-            <ion-select-option value="240">4m</ion-select-option>
-            <ion-select-option value="255">4m 15s</ion-select-option>
-            <ion-select-option value="270">4m 30s</ion-select-option>
-            <ion-select-option value="285">4m 45s</ion-select-option>
-            <ion-select-option value="300">5m</ion-select-option>
-          </ion-select>
-        </div>
-
-
-        <!-- Sets Section -->
-        <div class="sets-section">
-          <div class="sets-header">
-            <div class="set-col">SET</div>
-            <div class="kg-col">KG</div>
-            <div class="reps-col">REPS</div>
-            <div class="completed-col">DONE</div>
+          <!-- Rest Timer -->
+          <div class="timer-section">
+            <div class="section-label">Rest Timer:</div>
+            <ion-select 
+              [(ngModel)]="exercise.restTimeSeconds" 
+              [ngModelOptions]="{standalone: true}" 
+              interface="popover" 
+              [selectedText]="getRestTimeDisplay(exercise.restTimeSeconds || 0)">
+              <ion-select-option value="0">Off</ion-select-option>
+              <ion-select-option value="15">15s</ion-select-option>
+              <ion-select-option value="30">30s</ion-select-option>
+              <ion-select-option value="45">45s</ion-select-option>
+              <ion-select-option value="60">1m</ion-select-option>
+              <ion-select-option value="75">1m 15s</ion-select-option>
+              <ion-select-option value="90">1m 30s</ion-select-option>
+              <ion-select-option value="105">1m 45s</ion-select-option>
+              <ion-select-option value="120">2m</ion-select-option>
+              <ion-select-option value="135">2m 15s</ion-select-option>
+              <ion-select-option value="150">2m 30s</ion-select-option>
+              <ion-select-option value="165">2m 45s</ion-select-option>
+              <ion-select-option value="180">3m</ion-select-option>
+              <ion-select-option value="195">3m 15s</ion-select-option>
+              <ion-select-option value="210">3m 30s</ion-select-option>
+              <ion-select-option value="225">3m 45s</ion-select-option>
+              <ion-select-option value="240">4m</ion-select-option>
+              <ion-select-option value="255">4m 15s</ion-select-option>
+              <ion-select-option value="270">4m 30s</ion-select-option>
+              <ion-select-option value="285">4m 45s</ion-select-option>
+              <ion-select-option value="300">5m</ion-select-option>
+            </ion-select>
           </div>
-          
-          <!-- Simplified structure with fewer nested elements -->
-          <ion-item-sliding *ngFor="let set of exercise.sets; let setIndex = index">
-            <div class="set-row-wrapper">
-              <ion-item lines="none" class="set-row">
-                <!-- Set type -->
-                <ion-select slot="start" class="set-col set-type-select"
-                  [(ngModel)]="set.type" 
+
+
+          <!-- Sets Section -->
+          <div class="sets-section">
+            <div class="sets-header">
+              <div class="set-col">SET</div>
+              <div class="kg-col">KG</div>
+              <div class="reps-col">REPS</div>
+              <div class="completed-col">DONE</div>
+              <div class="remove-col"></div>
+            </div>
+            
+            <div *ngFor="let set of exercise.sets; let setIndex = index" 
+                 class="set-row" 
+                 [class.completed-set]="set.completed">
+              <!-- Set column -->
+              <div class="set-col">
+                <ion-select [(ngModel)]="set.type" 
                   [ngModelOptions]="{standalone: true}" 
                   [ngClass]="{
+                    'set-type-select': true,
                     'warmup-type': set.type === SetType.WARMUP,
                     'dropset-type': set.type === SetType.DROPSET,
                     'failure-type': set.type === SetType.FAILURE,
@@ -143,49 +150,59 @@
                   <ion-select-option [value]="SetType.DROPSET">D</ion-select-option>
                   <ion-select-option [value]="SetType.FAILURE">F</ion-select-option>
                 </ion-select>
-                
-                <!-- Weight -->
-                <ion-input slot="start" class="kg-col"
-                  type="number"
-                  [(ngModel)]="set.weight"
-                  (ionChange)="onWeightChange(set, set.weight || 0)"
-                  inputmode="decimal"
-                  min="0"
-                  placeholder="0">
-                </ion-input>
-                
-                <!-- Reps -->
-                <ion-input slot="start" class="reps-col"
-                  type="number"
-                  [(ngModel)]="set.reps"
-                  (ionChange)="onRepsChange(set, set.reps || 0)"
-                  inputmode="numeric"
-                  min="0"
-                  placeholder="0">
-                </ion-input>
-                
-                <!-- Checkbox -->
-                <ion-checkbox slot="end" class="completed-col set-completion-checkbox"
-                  [checked]="set.completed" 
-                  (ionChange)="toggleSetComplete(set)">
-                </ion-checkbox>
-              </ion-item>
+              </div>
               
-              <!-- Swipe options remain the same -->
-              <ion-item-options side="end">
-                <ion-item-option color="danger" (click)="removeSet(exercise, setIndex)">
-                  <ion-icon slot="icon-only" name="trash"></ion-icon>
-                </ion-item-option>
-              </ion-item-options>
+              <!-- KG column -->
+              <div class="kg-col">
+                <ion-item lines="none" class="input-item">
+                  <ion-input
+                    type="number"
+                    [(ngModel)]="set.weight"
+                    (ionChange)="onWeightChange(set, set.weight || 0)"
+                    inputmode="decimal"
+                    min="0"
+                    placeholder="0">
+                  </ion-input>
+                </ion-item>
+              </div>
+              
+              <!-- Reps column -->
+              <div class="reps-col">
+                <ion-item lines="none" class="input-item">
+                  <ion-input
+                    type="number"
+                    [(ngModel)]="set.reps"
+                    (ionChange)="onRepsChange(set, set.reps || 0)"
+                    inputmode="numeric"
+                    min="0"
+                    placeholder="0">
+                  </ion-input>
+                </ion-item>
+              </div>
+              
+              <!-- Done column -->
+              <div class="completed-col">
+                <ion-checkbox 
+                  [checked]="set.completed" 
+                  (ionChange)="toggleSetComplete(set)"
+                  class="set-completion-checkbox">
+                </ion-checkbox>
+              </div>
+              
+              <!-- Remove column -->
+              <div class="remove-col">
+                <button class="remove-button" (click)="removeSet(exercise, setIndex)">
+                  <ion-icon name="close-outline"></ion-icon>
+                </button>
+              </div>
             </div>
-          </ion-item-sliding>
-          
-          <button class="add-set-button" (click)="addSet(exercise)">
-            <ion-icon name="add-circle-outline"></ion-icon>
-            Add Set
-          </button>
+            
+            <button class="add-set-button" (click)="addSet(exercise)">
+              <ion-icon name="add"></ion-icon> Add set
+            </button>
+          </div>
         </div>
-      </div>
+      </ion-reorder-group>
 
       <!-- Action Buttons -->
       <div *ngIf="exercises.length > 0">
@@ -230,18 +247,7 @@
       </div>
       
       <div class="library-filters">
-        <ion-select
-          [(ngModel)]="selectedEquipment"
-          (ionChange)="filterExercises()"
-          placeholder="All Equipment"
-          interface="popover">
-          <ion-select-option value="All Equipment">All Equipment</ion-select-option>
-          <ion-select-option value="Barbell">Barbell</ion-select-option>
-          <ion-select-option value="Dumbbell">Dumbbell</ion-select-option>
-          <ion-select-option value="Bodyweight">Bodyweight</ion-select-option>
-          <ion-select-option value="Machine">Machine</ion-select-option>
-        </ion-select>
-        
+        <!-- Keep only the muscle filter -->
         <ion-select
           [(ngModel)]="selectedMuscleGroup"
           (ionChange)="filterExercises()"
@@ -251,8 +257,11 @@
           <ion-select-option value="Chest">Chest</ion-select-option>
           <ion-select-option value="Back">Back</ion-select-option>
           <ion-select-option value="Shoulders">Shoulders</ion-select-option>
+          <ion-select-option value="Biceps">Biceps</ion-select-option>
+          <ion-select-option value="Triceps">Triceps</ion-select-option>
           <ion-select-option value="Legs">Legs</ion-select-option>
-          <ion-select-option value="Arms">Arms</ion-select-option>
+          <ion-select-option value="Abs">Abs</ion-select-option>
+          <ion-select-option value="Cardio">Cardio</ion-select-option>
         </ion-select>
       </div>
       

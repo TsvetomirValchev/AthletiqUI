@@ -14,6 +14,7 @@ import { ExerciseSet } from '../../models/exercise-set.model';
 import { SetType } from '../../models/set-type.enum';
 import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { Workout } from '../../models/workout.model';
+import { ItemReorderEventDetail } from '@ionic/angular';
 
 @Component({
   selector: 'app-active-workout',
@@ -34,6 +35,8 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   SetType = SetType;
   isPaused = false; // Add this property
   isCompleting = false;
+  muscleFilter = '';
+  searchQuery = '';
 
   // Add these new properties
   exerciseTemplates: ExerciseTemplate[] = [];
@@ -41,7 +44,9 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   filteredTemplates: ExerciseTemplate[] = [];
   searchTerm: string = '';
   selectedMuscleGroup: string = 'All Muscles';
-  selectedEquipment: string = 'All Equipment';
+
+  // Add this flag to track if exercise order has changed
+  private exerciseOrderChanged = false;
 
   constructor(
     private activeWorkoutService: ActiveWorkoutService,
@@ -309,13 +314,28 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     });
   }
 
+  // Update the loadExercises method to ensure we load by orderPosition
   loadExercises(workoutId: string) {
-    this.workoutService.getExercisesForWorkout(workoutId).subscribe({
+    this.activeWorkoutService.getExercisesByWorkoutId(workoutId).subscribe({
       next: (exercises: Exercise[]) => {
-        this.exercises = exercises;
+        // Log the exercises before sorting
+        console.log('Exercises before sorting:', 
+          exercises.map(e => `${e.name} (pos: ${e.orderPosition})`));
+        
+        // Sort exercises by orderPosition before assigning
+        this.exercises = [...exercises].sort((a, b) => 
+          (a.orderPosition || 0) - (b.orderPosition || 0)
+        );
+        
+        // Log the exercises after sorting
+        console.log('Exercises after sorting:', 
+          this.exercises.map(e => `${e.name} (pos: ${e.orderPosition})`));
+        
         this.isLoading = false;
+        this.changeDetector.markForCheck();
       },
       error: (error: Error) => {
+        console.error('Error loading exercises:', error);
         this.showToast('Error loading exercises');
         this.isLoading = false;
       }
@@ -436,6 +456,10 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     this.showExerciseLibrary = true;
     this.isLoading = true;
     
+    // Reset filters when opening
+    this.searchTerm = '';
+    this.selectedMuscleGroup = 'All Muscles';
+    
     // Load templates if needed
     if (this.exerciseTemplates.length === 0) {
       this.workoutService.getExerciseTemplates().subscribe({
@@ -510,6 +534,11 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   
   // Add search and filter methods
   filterExercises() {
+    if (!this.exerciseTemplates || this.exerciseTemplates.length === 0) {
+      this.filteredTemplates = [];
+      return;
+    }
+    
     let filtered = [...this.exerciseTemplates];
     
     // Apply search term filter
@@ -524,12 +553,13 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     // Apply muscle group filter
     if (this.selectedMuscleGroup && this.selectedMuscleGroup !== 'All Muscles') {
       filtered = filtered.filter(t => 
-        t.targetMuscleGroups?.includes(this.selectedMuscleGroup)
+        t.targetMuscleGroups?.some(muscle => 
+          muscle.toLowerCase() === this.selectedMuscleGroup.toLowerCase())
       );
     }
-   
     
     this.filteredTemplates = filtered;
+    this.changeDetector.markForCheck();
   }
   
   onSearch(event: any) {
@@ -743,10 +773,11 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
                   loading.dismiss();
                   this.showToast('Workout routine updated successfully');
                   
-                  // Add a small delay to allow the service to refresh data
-                  setTimeout(() => {
-                    this.router.navigate(['/tabs/workouts']);
-                  }, 100);
+                  // Reset the exercise order changed flag
+                  this.exerciseOrderChanged = false;
+                  
+                  // Navigate to profile page
+                  this.router.navigate(['/tabs/profile']);
                 },
                 error: (error: any) => {
                   loading.dismiss();
@@ -767,15 +798,22 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   private prepareExercisesForTemplate(exercises: Exercise[]): Exercise[] {
     console.log('Preparing exercises for template update:', exercises.length);
     
-    return exercises
+    // First sort by orderPosition to ensure correct order
+    const sortedExercises = [...exercises].sort((a, b) => 
+      (a.orderPosition || 0) - (b.orderPosition || 0)
+    );
+    
+    return sortedExercises
       // Remove temporary exercises that haven't been saved to backend
       .filter(ex => !ex.exerciseId?.startsWith('temp-'))
-      .map(exercise => {
+      .map((exercise, index) => {
         // Create a proper copy to avoid reference issues
         return {
           ...exercise,
           // Keep the exerciseTemplateId to maintain connection to exercise library
           exerciseTemplateId: exercise.exerciseTemplateId,
+          // Ensure orderPosition is properly set based on current array position
+          orderPosition: index, // Force the correct order position
           sets: (exercise.sets || [])
             // Sort sets by order position
             .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0))
@@ -1134,6 +1172,94 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       }
     });
   }
-}
 
+  // Updated applyFilters method for exercise templates
+  applyFilters() {
+    if (!this.exerciseTemplates || this.exerciseTemplates.length === 0) {
+      return;
+    }
+    
+    this.filteredTemplates = this.exerciseTemplates.filter(template => {
+      // Check if it matches muscle filter
+      const matchesMuscle = !this.muscleFilter || 
+        (template.targetMuscleGroups && 
+         template.targetMuscleGroups.some(muscle => 
+           muscle.toLowerCase() === this.muscleFilter.toLowerCase()));
+      
+      // Check if it matches search query
+      const matchesSearch = !this.searchQuery || 
+        template.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+      
+      // Include only if it matches both criteria
+      return matchesMuscle && matchesSearch;
+    });
+  }
+
+  // Add method to handle exercise reordering
+  reorderExercises(event: CustomEvent<ItemReorderEventDetail>) {
+    // Keep a reference to the moved item
+    const itemMove = this.exercises.splice(event.detail.from, 1)[0];
+    
+    // Insert the item at its new position
+    this.exercises.splice(event.detail.to, 0, itemMove);
+    
+    // Complete the reorder operation
+    event.detail.complete();
+
+    console.log('Reordering exercises from', event.detail.from, 'to', event.detail.to);
+    
+    // Update orderPosition for all exercises based on their index in the array
+    this.exercises.forEach((exercise, index) => {
+      exercise.orderPosition = index;
+      console.log(`Exercise ${exercise.name} new orderPosition: ${index}`);
+    });
+    
+    // Mark that order has changed
+    this.exerciseOrderChanged = true;
+    
+    // Update the local workout in IndexedDB with the correct order
+    this.updateLocalExerciseOrder();
+    
+    // Force change detection
+    this.changeDetector.markForCheck();
+  }
+  
+  // Fix the updateLocalExerciseOrder method to properly update IndexedDB
+  private updateLocalExerciseOrder() {
+    if (!this.workout?.workoutId) {
+      console.error('Cannot update exercise order: workoutId is missing');
+      return;
+    }
+    
+    // Get the current session from the service
+    const currentSession = this.activeWorkoutService.getCurrentSession();
+    if (!currentSession) {
+      console.error('Cannot update exercise order: no active session found');
+      return;
+    }
+    
+    console.log('Updating exercise order in IndexedDB');
+    
+    // Create a fresh copy of the exercises array with updated orderPositions
+    const updatedExercises = this.exercises.map((exercise, index) => ({
+      ...exercise,
+      orderPosition: index  // Ensure orderPosition matches its array index
+    }));
+    
+    console.log('Updated exercises with new order:', 
+      updatedExercises.map(e => `${e.name} (pos: ${e.orderPosition})`));
+    
+    // Update the session with the new exercises array
+    const updatedSession = {
+      ...currentSession,
+      exercises: updatedExercises
+    };
+    
+    // Update the workout session in the service AND IndexedDB
+    this.activeWorkoutService.updateSession(updatedSession);
+    
+    // Log verification
+    console.log('Session updated in service');
+  }
+}
 

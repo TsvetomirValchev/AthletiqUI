@@ -665,4 +665,14 @@ export class WorkoutService implements OnDestroy {
       })
     );
   }
+
+  // Add this method to update exercise order
+  updateExerciseOrder(routineId: string, orderPayload: {exerciseId: string, orderPosition: number}[]): Observable<any> {
+    return this.http.put(`${this.apiUrl}/workouts/${routineId}/exercise-order`, orderPayload);
+  }
+
+  // Add this method to WorkoutService
+  updateExercise(workoutId: string, exerciseId: string, exerciseDTO: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/workouts/${workoutId}/exercises/${exerciseId}`, exerciseDTO);
+  }
 }

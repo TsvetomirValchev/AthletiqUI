@@ -130,9 +130,17 @@ export class ActiveWorkoutService {
           switchMap(fetchedWorkout => {
             return this.http.get<Exercise[]>(`${this.workoutApiUrl}/${workout.workoutId}/exercises`).pipe(
               map(exercises => {
+                // Sort exercises by orderPosition before creating the session
+                const sortedExercises = [...exercises].sort(
+                  (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
+                );
+                
+                console.log('Sorted exercises by orderPosition:', 
+                  sortedExercises.map(e => `${e.name || e.name} (order: ${e.orderPosition})`));
+                
                 const session: WorkoutSession = {
                   workout: fetchedWorkout,
-                  exercises: exercises,
+                  exercises: sortedExercises,
                   startTime: workout.startTime || new Date().toISOString(),
                   elapsedTimeSeconds: 0,
                   isPaused: false,
@@ -1136,7 +1144,13 @@ export class ActiveWorkoutService {
   }
 
   // Helper method to update the session
-  private updateSession(session: WorkoutSession): void {
+  public updateSession(session: WorkoutSession): void {
+    // Update the behavior subject
     this.currentSessionSubject.next(session);
+    
+    // Save the updated session to storage
+    this.saveCurrentSession();
   }
+
+
 }

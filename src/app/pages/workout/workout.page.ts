@@ -90,7 +90,13 @@ export class WorkoutPage implements OnInit, OnDestroy {
   getWorkoutExercises(workoutId: string): Exercise[] {
     if (!this.exercisesCache.has(workoutId)) {
       const exercises = this.workoutExercises.get(workoutId) || [];
-      this.exercisesCache.set(workoutId, exercises);
+      // Sort exercises by orderPosition before caching
+      const sortedExercises = [...exercises].sort(
+        (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
+      );
+      console.log(`Sorted exercises for workout ${workoutId}:`, 
+        sortedExercises.map(e => `${e.name} (order: ${e.orderPosition})`));
+      this.exercisesCache.set(workoutId, sortedExercises);
     }
     return this.exercisesCache.get(workoutId) || [];
   }

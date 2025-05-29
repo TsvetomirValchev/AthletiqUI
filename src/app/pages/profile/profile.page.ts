@@ -1,4 +1,4 @@
-import { Component, OnInit, isDevMode, OnDestroy } from '@angular/core';
+import { Component, OnInit, isDevMode, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -11,7 +11,7 @@ import { ExerciseHistory } from '../../models/exercise-history.model';
 import { SetHistory } from '../../models/set-history.model';
 import { AuthService } from '../../services/auth.service';
 import { finalize, switchMap } from 'rxjs/operators';
-import { of, forkJoin, Observable, Subscription } from 'rxjs';
+import { of, forkJoin, Observable, Subscription, BehaviorSubject } from 'rxjs';
 import { ToastController } from '@ionic/angular';
 import { ExerciseImageService } from '../../services/exercise-image.service';
 import { SetType } from '../../models/set-type.enum';
@@ -49,13 +49,15 @@ export class ProfilePage implements OnInit, OnDestroy {
 
   // Add this property
   private subscriptions: Subscription = new Subscription();
+  private refreshTrigger = new BehaviorSubject<boolean>(true);
   
   constructor(
     private profileService: ProfileService,
     private workoutHistoryService: WorkoutHistoryService,
     private authService: AuthService,
     private toastController: ToastController,
-    private exerciseImageService: ExerciseImageService
+    private exerciseImageService: ExerciseImageService,
+    private changeDetector: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -297,11 +299,19 @@ export class ProfilePage implements OnInit, OnDestroy {
     this.workoutHistoryService.getWorkoutHistoryDetail(actualWorkoutId).subscribe({
       next: (details) => {        
         console.log('Workout details loaded successfully:', details);
-        console.log('Exercise histories present:', details.exerciseHistories?.length || 0);
+        
+        // Sort sets within each exercise by order position
+        this.ensureSortedSets(details);
         
         if (details.exerciseHistories) {
           details.exerciseHistories.forEach((ex, i) => {
             console.log(`Exercise ${i}: ${ex.exerciseName}, Sets: ${ex.exerciseSetHistories?.length || 0}`);
+            if (ex.exerciseSetHistories && ex.exerciseSetHistories.length > 0) {
+              console.log('  Set types:');
+              ex.exerciseSetHistories.forEach((set, index) => {
+                console.log(`    Set ${index}: ${set.type || 'NORMAL'}`);
+              });
+          }
           });
           
           this.initializeExerciseVisibility(details);
@@ -349,20 +359,16 @@ export class ProfilePage implements OnInit, OnDestroy {
     const key = this.getExerciseKey(exercise);
     const currentValue = this.exerciseVisibilityMap.get(key) || false;
     
-    console.log('Toggle exercise sets:', exercise);
-    console.log('Exercise sets available:', exercise.exerciseSetHistories?.length || 0);
-    if (exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0) {
-      console.log('First set:', exercise.exerciseSetHistories[0]);
-    } else {
-      console.warn('No sets found for this exercise. This might indicate a data loading issue.');
-      
-      if (!currentValue && this.expandedWorkoutIndex !== null) {
-        const workout = this.workoutHistory[this.expandedWorkoutIndex];
-        console.log('Attempting to ensure exercise sets are loaded from workout:', workout);
-      }
-    }
-    
     this.exerciseVisibilityMap.set(key, !currentValue);
+    
+    // Force refresh when sets are displayed
+    if (!currentValue) {
+      // A small delay to ensure sets are rendered first
+      setTimeout(() => {
+        this.refreshTrigger.next(true);
+        this.changeDetector.detectChanges();
+      }, 50);
+    }
   }
   
   /**
@@ -501,69 +507,83 @@ export class ProfilePage implements OnInit, OnDestroy {
   }
 
   /**
-   * Get display label for a set
+   * Get display label for a set - direct fix that explicitly forces correct numbering
    */
-  getSetDisplay(set: SetHistory): string {
-    // If it's a special set type, return the letter
-    if (set.type) {
-      switch (set.type) {
-        case 'WARMUP':
-          return 'W';
-        case 'DROPSET':
-          return 'D';
-        case 'FAILURE':
-          return 'F';
-      }
+  getSetDisplay(set: SetHistory, exercise?: ExerciseHistory): string {
+    console.log(`getSetDisplay called for set:`, set); // Debug to verify method is called
+  
+    // First check for special types - these return letters
+    if (set.type && set.type !== 'NORMAL') {
+      if (set.type === 'WARMUP') return 'W';
+      if (set.type === 'DROPSET') return 'D';
+      if (set.type === 'FAILURE') return 'F';
     }
+
+    // For normal sets, we need to track which normal set number this is
+    if (!exercise?.exerciseSetHistories) return '1';
     
-    // For normal sets, just return the order position
-    if (!set.orderPosition) {
+    // Get all sets sorted by order position
+    const sortedSets = [...exercise.exerciseSetHistories]
+      .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0));
+    
+    // Find the index of the current set in the sorted array
+    const currentSetIndex = sortedSets.findIndex(s => 
+      s === set || // Direct object reference comparison
+      (s.setHistoryId && s.setHistoryId === set.setHistoryId) || // ID comparison if available
+      (s.orderPosition === set.orderPosition && s.weight === set.weight && s.reps === set.reps) // Property comparison
+    );
+    
+    if (currentSetIndex === -1) {
+      console.warn('Could not find set in exercise:', set);
       return '1';
     }
     
-    // Find which exercise contains this set
-    const exercise = this.findExerciseForSet(set);
-    if (!exercise || !exercise.exerciseSetHistories) {
-      return set.orderPosition.toString();
-    }
+    // Count normal sets up to and including this one
+    let normalSetCounter = 0;
     
-    // Count only normal sets up to this one
-    let normalSetCount = 0;
-    for (const currentSet of exercise.exerciseSetHistories) {
-      // If we've reached this set, return the count
-      if (currentSet.setHistoryId === set.setHistoryId) {
-        return (normalSetCount + 1).toString();
-      }
-      
-      // Only count normal sets
+    for (let i = 0; i <= currentSetIndex; i++) {
+      const currentSet = sortedSets[i];
       if (!currentSet.type || currentSet.type === 'NORMAL') {
-        normalSetCount++;
+        normalSetCounter++;
       }
     }
     
-    // Fallback
-    return set.orderPosition.toString();
+    console.log(`Set at position ${currentSetIndex} is normal set #${normalSetCounter}`);
+    return normalSetCounter.toString();
   }
 
   /**
-   * Find which exercise contains a given set
+   * Ensure sets are properly sorted by orderPosition
    */
-  private findExerciseForSet(set: SetHistory): ExerciseHistory | undefined {
-    if (!this.workoutHistory) return undefined;
-    
-    for (const workout of this.workoutHistory) {
-      if (!workout.exerciseHistories) continue;
+  private ensureSortedSets(workout: WorkoutHistory): void {
+  if (!workout.exerciseHistories) return;
+  
+  let changed = false;
+  
+  workout.exerciseHistories.forEach(exercise => {
+    if (exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0) {
+      // Sort the sets
+      const sortedSets = [...exercise.exerciseSetHistories].sort(
+        (a, b) => (a.orderPosition || 0) - (b.orderPosition || 0)
+      );
       
-      for (const exercise of workout.exerciseHistories) {
-        if (!exercise.exerciseSetHistories) continue;
-        
-        // Check if this set belongs to this exercise by comparing IDs
-        if (exercise.exerciseSetHistories.some(s => s.setHistoryId === set.setHistoryId)) {
-          return exercise;
-        }
-      }
+      // Create a brand new array to trigger change detection
+      exercise.exerciseSetHistories = sortedSets;
+      changed = true;
+      
+      console.log(`Sorted sets for ${exercise.exerciseName}:`);
+      sortedSets.forEach((s, i) => {
+        console.log(`${i}: ID=${s.setHistoryId}, Type=${s.type || 'NORMAL'}, Order=${s.orderPosition}`);
+      });
     }
-    
-    return undefined;
+  });
+  
+  // Force change detection
+  if (changed) {
+      setTimeout(() => {
+        console.log('Forcing change detection after sort');
+        this.changeDetector.detectChanges();
+      }, 0);
+    }
   }
 }

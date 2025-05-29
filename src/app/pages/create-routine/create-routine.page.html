@@ -189,17 +189,19 @@
         <div class="subtitle">Click on an exercise to add it to your routine</div>
       </div>
 
+      <!-- Replace the library-filters section with this: -->
       <div class="library-filters">
-        <div class="filter-dropdown">
-          <select class="filter-select">
-            <option>All Equipment</option>
-          </select>
-        </div>
-        <div class="filter-dropdown">
-          <select class="filter-select">
-            <option>All Muscles</option>
-          </select>
-        </div>
+        <select class="filter-select" [(ngModel)]="muscleFilter" (change)="applyFilters()">
+          <option value="">All Muscles</option>
+          <option value="chest">Chest</option>
+          <option value="back">Back</option>
+          <option value="shoulders">Shoulders</option>
+          <option value="biceps">Biceps</option>
+          <option value="triceps">Triceps</option>
+          <option value="legs">Legs</option>
+          <option value="abs">Abs</option>
+          <option value="cardio">Cardio</option>
+        </select>
       </div>
 
       <div class="search-bar">

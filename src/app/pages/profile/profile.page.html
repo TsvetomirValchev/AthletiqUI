@@ -106,9 +106,9 @@
                 </div>
                 
                 <!-- Set rows -->
-                <div *ngFor="let set of exercise.exerciseSetHistories" class="set-row" 
+                <div *ngFor="let set of exercise.exerciseSetHistories; let i = index" class="set-row" 
                      [ngClass]="getSetTypeClass(set.type)">
-                  <div class="set-cell">{{ getSetDisplay(set) }}</div>
+                  <div class="set-cell">{{ getSetDisplay(set, exercise) }}</div>
                   <div class="weight-cell">{{ set.weight || 0 }} kg</div>
                   <div class="reps-cell">{{ set.reps || 0 }}</div>
                   <div class="status-cell">

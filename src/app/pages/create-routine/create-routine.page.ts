@@ -28,6 +28,9 @@ export class CreateRoutinePage implements OnInit {
   showLibraryOnMobile = false;
   private tempExerciseSets = new Map<string, ExerciseSet[]>();
   private tempNewExerciseSets = new Map<number, ExerciseSet[]>();
+  filteredTemplates: ExerciseTemplate[] = [];
+  muscleFilter = '';
+  searchQuery = '';
 
   constructor(
     private fb: FormBuilder,
@@ -126,13 +129,13 @@ export class CreateRoutinePage implements OnInit {
   addExerciseFromTemplate(template: ExerciseTemplate) {
     if (!template || !template.exerciseTemplateId) return;
     
-    console.log('Adding exercise from template with ID:', template.exerciseTemplateId);
-    
-    // Create Exercise object directly
+    // Create Exercise object with orderPosition based on current array length
     const newExercise: Exercise = {
       exerciseTemplateId: template.exerciseTemplateId,
       name: template.name,
       notes: '',
+      // Set the orderPosition to be the last position
+      orderPosition: this.exercises.length,
       // Initialize with a single set
       sets: [
         {
@@ -146,7 +149,6 @@ export class CreateRoutinePage implements OnInit {
       ]
     };
     
-    console.log('Created new exercise with template ID:', newExercise.exerciseTemplateId);
     this.exercises.push(newExercise);
     this.showToast(`Added ${template.name}`);
   }
@@ -277,9 +279,12 @@ export class CreateRoutinePage implements OnInit {
         workoutId: workoutId || undefined
       };
       
-      // Make sure all exercises have their sets properly attached
+      // Make sure all exercises have their sets and orderPosition properly attached
       const exercisesToSave: Exercise[] = this.exercises.map((exercise, index) => {
         let exerciseCopy: Exercise = { ...exercise };
+        
+        // Ensure orderPosition is set correctly based on current array position
+        exerciseCopy.orderPosition = index;
         
         // First, try to get sets from the exercise object itself
         let sets = [...(exercise.sets || [])];
@@ -365,7 +370,10 @@ export class CreateRoutinePage implements OnInit {
             
             forkJoin(exerciseLoads).subscribe({
               next: (exercisesWithSets) => {
-                this.exercises = exercisesWithSets;
+                // Sort exercises by orderPosition before assigning to this.exercises
+                this.exercises = exercisesWithSets.sort((a, b) => 
+                  (a.orderPosition || 0) - (b.orderPosition || 0)
+                );
                 this.isLoading = false;
               },
               error: (error) => {
@@ -542,6 +550,12 @@ async removeExercise(index: number) {
           next: () => {
             // Remove from local array
             this.exercises.splice(index, 1);
+            
+            // Update orderPosition for remaining exercises
+            this.exercises.forEach((exercise, idx) => {
+              exercise.orderPosition = idx;
+            });
+            
             this.showToast('Exercise removed successfully');
             
             // Clear any temporary sets for this exercise
@@ -561,6 +575,11 @@ async removeExercise(index: number) {
   } else {
     // For new exercises that aren't saved to the backend yet
     this.exercises.splice(index, 1);
+    
+    // Update orderPosition for remaining exercises
+    this.exercises.forEach((exercise, idx) => {
+      exercise.orderPosition = idx;
+    });
     
     // Clear any temporary sets for this exercise
     if (this.tempNewExerciseSets.has(index)) {
@@ -624,11 +643,19 @@ private reindexTempExerciseSets() {
   }
 
   reorderExercises(event: CustomEvent<ItemReorderEventDetail>) {
+    // Move the item in the array
     const itemMove = this.exercises.splice(event.detail.from, 1)[0];
     this.exercises.splice(event.detail.to, 0, itemMove);
     
+    // Complete the reorder operation
     event.detail.complete();
-  
+
+    // Update orderPosition for all exercises based on their index in the array
+    this.exercises.forEach((exercise, index) => {
+      exercise.orderPosition = index;
+    });
+    
+    // Create a new array reference to ensure change detection
     this.exercises = [...this.exercises];
   }
 
@@ -648,4 +675,25 @@ private reindexTempExerciseSets() {
     
     this.router.navigate(['/tabs/workouts']);
   }
+
+  applyFilters() {
+  if (!this.exerciseTemplates || this.exerciseTemplates.length === 0) {
+    return;
+  }
+  
+  this.filteredTemplates = this.exerciseTemplates.filter(template => {
+    // Check if it matches muscle filter
+    const matchesMuscle = !this.muscleFilter || 
+      (template.targetMuscleGroups && 
+        template.targetMuscleGroups.some(muscle => 
+          muscle.toLowerCase() === this.muscleFilter.toLowerCase()));
+    
+    // Check if it matches search query
+    const matchesSearch = !this.searchQuery || 
+      template.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+    
+    // Include only if it matches both criteria
+    return matchesMuscle && matchesSearch;
+  });
+}
 }

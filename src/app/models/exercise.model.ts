@@ -7,6 +7,7 @@ export interface Exercise {
   name: string;
   notes?: string;
   exerciseSetIds?: string[];
+  orderPosition?: number;
   sets?: ExerciseSet[];
   totalSets?: number;
   maxWeight?: number;
