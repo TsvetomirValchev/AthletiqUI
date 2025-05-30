@@ -8,7 +8,6 @@ import { ActiveWorkoutService } from './services/active-workout.service';
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
-  standalone: true,
   imports: [
     IonicModule,
     RouterModule,

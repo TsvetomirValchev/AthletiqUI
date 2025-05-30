@@ -46,13 +46,6 @@ export class IndexedDBService {
           store.createIndex('workoutId', 'workoutId', { unique: true });
           console.log('Created active_workouts store');
         }
-        
-        // Create completed sets store
-        if (!db.objectStoreNames.contains('completed_sets')) {
-          const store = db.createObjectStore('completed_sets', { keyPath: 'setId' });
-          store.createIndex('workoutId', 'workoutId', { unique: false });
-          console.log('Created completed_sets store');
-        }
       };
     });
   }

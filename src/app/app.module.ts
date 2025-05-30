@@ -16,7 +16,6 @@ import { TokenRefreshInterceptor } from './interceptors/token-refresh.intercepto
     IonicModule.forRoot(),
     HttpClientModule,
     AppRoutingModule,
-    AppComponent,
   ],
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },

@@ -521,6 +521,13 @@ ion-input {
     border: none;
   }
   
+  .save-button:disabled {
+    background-color: #505050;  /* Gray background */
+    color: #aaaaaa;             /* Light gray text */
+    opacity: 0.7;               /* Slightly transparent */
+    cursor: not-allowed;        /* Show not-allowed cursor */
+  }
+  
   .discard-button {
     background-color: transparent;
     color: #ff3b30;

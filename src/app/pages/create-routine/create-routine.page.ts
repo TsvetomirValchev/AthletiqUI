@@ -106,7 +106,7 @@ export class CreateRoutinePage implements OnInit {
                   sets: [
                     {
                       type: SetType.NORMAL,
-                      orderPosition: 1,
+                      orderPosition: 0,
                       reps: 0,
                       weight: 0,
                       restTimeSeconds: 0,
@@ -140,7 +140,7 @@ export class CreateRoutinePage implements OnInit {
       sets: [
         {
           type: SetType.NORMAL,
-          orderPosition: 1,
+          orderPosition: 0,
           reps: 0,
           weight: 0,
           restTimeSeconds: 0,
@@ -165,7 +165,7 @@ export class CreateRoutinePage implements OnInit {
       // Create new set
       const newSet: ExerciseSet = {
         type: SetType.NORMAL,
-        orderPosition: exercise.sets.length + 1,
+        orderPosition: exercise.sets.length,
         reps: 0,
         weight: 0,
         restTimeSeconds: 0,
@@ -246,7 +246,7 @@ export class CreateRoutinePage implements OnInit {
         
         // Update order positions after removal
         exercise.sets.forEach((set: ExerciseSet, idx: number) => {
-          set.orderPosition = idx + 1;
+          set.orderPosition = idx;
         });
         
         exercise.sets = [...exercise.sets];
@@ -265,11 +265,14 @@ export class CreateRoutinePage implements OnInit {
   }
 
   saveWorkout() {
+    console.log('Save button clicked.');
     if (this.routineForm.valid) {
       if (this.exercises.length === 0) {
         this.showToast('Please add at least one exercise to the workout');
         return;
       }
+      
+      this.isLoading = true;
       
       const workoutName = this.routineForm.value.name;
       const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
@@ -279,73 +282,82 @@ export class CreateRoutinePage implements OnInit {
         workoutId: workoutId || undefined
       };
       
+      // Debug: Log all exercises with their template IDs before processing
+      console.log('Raw exercises before mapping:', this.exercises.map(e => ({
+        name: e.name,
+        templateId: e.exerciseTemplateId
+      })));
+      
       // Make sure all exercises have their sets and orderPosition properly attached
       const exercisesToSave: Exercise[] = this.exercises.map((exercise, index) => {
-        let exerciseCopy: Exercise = { ...exercise };
+        // Create a complete copy with all properties
+        const exerciseCopy: Exercise = {
+          ...exercise,
+          orderPosition: index,
+          // Force the template ID to be included
+          exerciseTemplateId: exercise.exerciseTemplateId
+        };
         
-        // Ensure orderPosition is set correctly based on current array position
-        exerciseCopy.orderPosition = index;
-        
-        // First, try to get sets from the exercise object itself
+        // Handle sets
         let sets = [...(exercise.sets || [])];
+        sets = sets.map((set, setIndex) => ({
+          ...set,
+          orderPosition: setIndex
+        }));
         
-        // If the exercise has an ID, check the tempExerciseSets map
-        if (exercise.exerciseId && this.tempExerciseSets.has(exercise.exerciseId)) {
-          // Merge with any sets from tempExerciseSets
-          const tempSets = this.tempExerciseSets.get(exercise.exerciseId) || [];
-          sets = [...sets, ...tempSets];
-        } else {
-          // For new exercises without IDs, check tempNewExerciseSets using the index
-          const tempSets = this.tempNewExerciseSets.get(index) || [];
-          sets = [...sets, ...tempSets];
-        }
-        
-        // Ensure exerciseTemplateId is preserved
-        if (!exerciseCopy.exerciseTemplateId && exercise.exerciseTemplateId) {
-          exerciseCopy.exerciseTemplateId = exercise.exerciseTemplateId;
-        }
-        
-        // Assign the merged sets
+        // Reassign sets to the copy
         exerciseCopy.sets = sets;
+        
+        console.log(`Preparing exercise ${exerciseCopy.name}:`, {
+          templateId: exerciseCopy.exerciseTemplateId,
+          sets: exerciseCopy.sets?.length || 0
+        });
         
         return exerciseCopy;
       });
       
-      // If we're editing an existing workout
-      if (workoutId) {
-        this.workoutService.updateWorkoutWithExercises(workoutData, exercisesToSave)
-          .subscribe({
-            next: () => {
-              // Force a refresh before navigation
-              this.workoutService.refreshWorkouts();
-              
-              // Simple solution: don't use router navigation, use window location
-              // This forces a complete page reload which will refresh everything
-              window.location.href = '/tabs/workouts';
-              this.showToast('Workout updated successfully');
-            },
-            error: (error) => {
-              console.error('Error updating workout:', error);
-              this.showToast('Error updating workout');
-            }
-          });
-      } else {
-        // If we're creating a new workout
-        this.workoutService.createWorkoutWithExercises(workoutData, exercisesToSave)
-          .subscribe({
-            next: () => {
-              // Trigger refresh before navigating
-              this.workoutService.refreshWorkouts().subscribe(() => {
-                this.router.navigate(['/tabs/workouts'], { replaceUrl: true });
-                this.showToast('Workout created successfully');
-              });
-            },
-            error: (error) => {
-              console.error('Error creating workout:', error);
-              this.showToast('Error creating workout');
-            }
-          });
-      }
+      // Debug: Verify template IDs are present in final payload
+      console.log('Final exercises to save:', exercisesToSave.map(e => ({
+        name: e.name,
+        templateId: e.exerciseTemplateId,
+        setCount: e.sets?.length || 0
+      })));
+      
+      // Choose whether to create new or update existing
+      const saveOperation = workoutId
+        ? this.workoutService.updateWorkoutWithExercises(workoutData, exercisesToSave)
+        : this.workoutService.createWorkoutWithExercises(workoutData, exercisesToSave);
+      
+      // Process the operation
+      saveOperation.subscribe({
+        next: () => {
+          this.isLoading = false;
+          this.workoutService.refreshWorkouts();
+          
+          const message = workoutId 
+            ? 'Workout updated successfully' 
+            : 'Workout created successfully';
+          this.showToast(message);
+          
+          // Navigate after showing toast
+          setTimeout(() => {
+            window.location.href = '/tabs/workouts';
+          }, 500);
+        },
+        error: (error) => {
+          this.isLoading = false;
+          console.error('Error saving workout:', error);
+          this.showToast(`Error ${workoutId ? 'updating' : 'creating'} workout`);
+        }
+      });
+    } else {
+      // Form is invalid
+      this.showToast('Please enter a valid workout name');
+      
+      Object.keys(this.routineForm.controls).forEach(key => {
+        const control = this.routineForm.get(key);
+        control?.markAsTouched();
+      });
     }
   }
 
@@ -576,7 +588,6 @@ async removeExercise(index: number) {
     // For new exercises that aren't saved to the backend yet
     this.exercises.splice(index, 1);
     
-    // Update orderPosition for remaining exercises
     this.exercises.forEach((exercise, idx) => {
       exercise.orderPosition = idx;
     });

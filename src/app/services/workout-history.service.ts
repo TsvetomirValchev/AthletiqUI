@@ -54,10 +54,10 @@ export class WorkoutHistoryService {
       duration: completedWorkout.duration || `PT${this.calculateWorkoutDuration(completedWorkout)}S`,
       exerciseHistories: exercises.map((exercise, index) => ({
         exerciseName: exercise.name || 'Exercise',
-        orderPosition: index + 1,
+        orderPosition: index,
         notes: exercise.notes || '',
-        exerciseSetHistories: exercise.sets?.map((set, setIndex) => ({
-          orderPosition: set.orderPosition || setIndex + 1,
+        exerciseSetHistories: exercise.sets?.map((set) => ({
+          orderPosition: set.orderPosition,
           reps: set.reps || 0,
           weight: set.weight || 0,
           completed: set.completed || false,
@@ -85,20 +85,7 @@ export class WorkoutHistoryService {
   /**
    * Complete a workout and save it to history
    */
-  public completeWorkout(workout: ActiveWorkout, exercises: Exercise[]): Observable<any> {
-    console.log('Completing workout with exercises:', exercises);
-    
-    // Check exercise sets and log completion status
-    exercises.forEach(exercise => {
-      if (exercise.sets && exercise.sets.length > 0) {
-        // Log exercise completion status
-        const completedSets = exercise.sets.filter(set => set.completed);
-        console.log(
-          `Exercise ${exercise.name}: ${completedSets.length}/${exercise.sets.length} sets completed`
-        );
-      }
-    });
-    
+  public completeWorkout(workout: ActiveWorkout, exercises: Exercise[]): Observable<any> {    
     // Format current date as YYYY-MM-DD
     const currentDate = new Date().toISOString().split('T')[0];
     
@@ -107,14 +94,14 @@ export class WorkoutHistoryService {
     // Just ensure they have proper format for the backend
     const cleanedExercises = exercises
       // Don't filter by exerciseId - include all exercises
-      .map((exercise, index) => ({
+      .map((exercise) => ({
         exerciseName: exercise.name || 'Exercise',
-        orderPosition: index + 1, 
+        orderPosition: exercise.orderPosition, 
         notes: exercise.notes || '',
         exerciseSetHistories: (exercise.sets || [])
           // Don't filter by exerciseSetId - include all sets 
           .map((set, setIndex) => ({
-            orderPosition: setIndex + 1,
+            orderPosition: setIndex,
             reps: set.reps || 0,
             weight: set.weight || 0,
             completed: set.completed || false, // Make sure to preserve the completed state
@@ -183,19 +170,11 @@ export class WorkoutHistoryService {
           console.warn('No authenticated user found for workout history');
           return of([]);
         }
-        
-        console.log('Fetching workout history for user:', user.userId);
-        
+                
         return this.http.get<any[]>(`${this.apiUrl}/user/${user.userId}`).pipe(
           timeout(8000), // Add timeout to prevent hanging
           tap(response => {
             console.log('Raw workout history API response:', response);
-            // Check the first item to see its structure
-            if (response && response.length > 0) {
-              console.log('First workout object keys:', Object.keys(response[0]));
-              // Log the createdAt timestamp to verify it's coming from the backend
-              console.log('First workout createdAt:', response[0].createdAt);
-            }
           }),
           map(history => {
             if (!history || !Array.isArray(history)) {
@@ -239,26 +218,9 @@ export class WorkoutHistoryService {
       console.error('Cannot fetch workout details: missing or invalid ID');
       return throwError(() => new Error('Missing or invalid workout history ID'));
     }
-    
-    console.log(`Fetching workout details with ID: ${historyId}`);
-    
+        
     // Direct HTTP get without transformations
     return this.http.get<WorkoutHistory>(`${this.apiUrl}/${historyId}`).pipe(
-      tap(response => {
-        console.log(`Fetched detailed history for ID ${historyId}:`, response);
-        
-        // Debug info to verify the response structure
-        if (response.exerciseHistories && response.exerciseHistories.length > 0) {
-          console.log('Exercise histories present:', response.exerciseHistories.length);
-          
-          response.exerciseHistories.forEach((ex, i) => {
-            console.log(`Exercise ${i}: ${ex.exerciseName}, Sets:`, 
-              ex.exerciseSetHistories ? ex.exerciseSetHistories.length : 'none');
-          });
-        } else {
-          console.log('No exercise histories found in response');
-        }
-      }),
       catchError(error => {
         console.error(`Error fetching workout history detail for ID ${historyId}:`, error);
         return this.getFallbackWorkoutDetails(historyId);
@@ -322,12 +284,6 @@ export class WorkoutHistoryService {
           exerciseSetHistories: exercise.setHistories || [] // Map from API field name to model field name
         }));
       }),
-      tap(exercises => {
-        console.log(`Fetched ${exercises.length} exercises for workout ${workoutHistoryId}`);
-        exercises.forEach((ex, i) => {
-          console.log(`Exercise ${i}: ${ex.exerciseName}, Sets: ${ex.exerciseSetHistories?.length || 0}`);
-        });
-      }),
       catchError(error => {
         console.error(`Error fetching exercises for workout ${workoutHistoryId}:`, error);
         return throwError(() => new Error('Failed to load exercise data'));
@@ -340,7 +296,6 @@ export class WorkoutHistoryService {
    */
   public getSetHistoriesByExerciseId(exerciseHistoryId: string): Observable<SetHistory[]> {
     return this.http.get<SetHistory[]>(`${environment.apiUrl}/set-histories/exercise/${exerciseHistoryId}`).pipe(
-      tap(sets => console.log(`Fetched ${sets.length} sets for exercise ${exerciseHistoryId}`)),
       catchError(error => {
         console.error(`Error fetching sets for exercise ${exerciseHistoryId}:`, error);
         return throwError(() => new Error('Failed to load set data'));

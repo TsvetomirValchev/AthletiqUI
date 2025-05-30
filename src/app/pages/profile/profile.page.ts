@@ -198,18 +198,8 @@ export class ProfilePage implements OnInit, OnDestroy {
         
         if (detailedWorkouts && detailedWorkouts.length > 0) {
           this.workoutHistory = [...detailedWorkouts];
-          this.workoutHistory.forEach((workout, index) => {
-            console.log(`Workout ${index}:`, workout);
-            console.log(`Has ${workout.exerciseHistories?.length || 0} exercises`);
-            
-            // Initialize exercise visibility states
+          this.workoutHistory.forEach((workout) => {
             this.initializeExerciseVisibility(workout);
-            
-            if (workout.exerciseHistories) {
-              workout.exerciseHistories.forEach((ex, i) => {
-                console.log(`Exercise ${i}: ${ex.exerciseName}, Sets: ${ex.exerciseSetHistories?.length || 0}`);
-              });
-            }
           });
         } else {
           this.workoutHistory = [];
@@ -245,7 +235,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       return;
     }
     
-    console.log('Expanding workout details for ID:', workoutId);
     this.expandedWorkoutId = workoutId;
     this.loadingDetails = true;
     
@@ -268,12 +257,9 @@ export class ProfilePage implements OnInit, OnDestroy {
    * Toggle displaying workout details using array index
    */
   toggleWorkoutDetailsByIndex(index: number, workoutId?: string) {
-    console.log(`Toggle workout at index ${index}, raw ID:`, workoutId);
     
     const workout = this.workoutHistory[index];
-    
-    console.log("Full workout object:", workout);
-    console.log("ID from workout object:", workout.workoutHistoryId);
+  
     
     if (this.expandedWorkoutIndex === index) {
       this.expandedWorkoutIndex = null;
@@ -295,7 +281,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
     
     this.expandedWorkoutId = actualWorkoutId;
-    console.log('Using ID for details request:', actualWorkoutId);
     this.workoutHistoryService.getWorkoutHistoryDetail(actualWorkoutId).subscribe({
       next: (details) => {        
         console.log('Workout details loaded successfully:', details);
@@ -304,18 +289,7 @@ export class ProfilePage implements OnInit, OnDestroy {
         this.ensureSortedSets(details);
         
         if (details.exerciseHistories) {
-          details.exerciseHistories.forEach((ex, i) => {
-            console.log(`Exercise ${i}: ${ex.exerciseName}, Sets: ${ex.exerciseSetHistories?.length || 0}`);
-            if (ex.exerciseSetHistories && ex.exerciseSetHistories.length > 0) {
-              console.log('  Set types:');
-              ex.exerciseSetHistories.forEach((set, index) => {
-                console.log(`    Set ${index}: ${set.type || 'NORMAL'}`);
-              });
-          }
-          });
-          
           this.initializeExerciseVisibility(details);
-          
           if (this.workoutHistory[index]) {
             this.workoutHistory[index] = details;
           }
@@ -343,9 +317,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       const key = this.getExerciseKey(typedExercise);
       
       this.exerciseVisibilityMap.set(key, false);
-      
-      // Debug the exercise sets data
-      console.log(`Initializing exercise: ${exercise.exerciseName} with ${exercise.exerciseSetHistories?.length || 0} sets`);
     });
   }
     /**
@@ -548,7 +519,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       }
     }
     
-    console.log(`Set at position ${currentSetIndex} is normal set #${normalSetCounter}`);
     return normalSetCounter.toString();
   }
 

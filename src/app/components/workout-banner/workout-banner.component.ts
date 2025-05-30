@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { filter } from 'rxjs/operators';
@@ -43,13 +43,6 @@ export class WorkoutBannerComponent implements OnInit, OnDestroy {
       this.checkCurrentRoute(event.url);
     });
     
-    // Debug check if there's an active session directly from ActiveWorkoutService
-    const currentSession = this.activeWorkoutService.getCurrentSession();
-    console.log('Current session from service on init:', currentSession);
-
-    // Also check localStorage directly as a backup
-    this.checkLocalStorage();
-    
     // Subscribe to the current workout for real-time updates
     this.subscription = this.activeWorkoutService.currentWorkout$.subscribe(workout => {
       console.log('Workout banner received workout update:', workout);
@@ -60,14 +53,15 @@ export class WorkoutBannerComponent implements OnInit, OnDestroy {
         this.workoutId = workout.workoutId;
         console.log(`Active workout detected: ${this.workoutName} (${this.workoutId})`);
       } else {
-        // Only set to false if we don't have a workout from localStorage
-        if (!this.hasActiveWorkout) {
-          console.log('No active workout detected from observable or localStorage');
-        }
+        // No current workout in the service
+        this.hasActiveWorkout = false;
+        this.workoutId = '';
+        this.workoutName = '';
+        console.log('No active workout detected from service');
       }
     });
     
-    // Subscribe to completion events
+    // Subscribe to completion events - this is critical for hiding the banner
     this.subscription.add(
       this.activeWorkoutService.workoutCompleted$.subscribe(() => {
         console.log('Banner received workout completed notification');
@@ -76,6 +70,9 @@ export class WorkoutBannerComponent implements OnInit, OnDestroy {
         this.workoutName = '';
       })
     );
+    
+    // Also check IndexedDB directly in case the component loads before the service initializes
+    this.checkActiveWorkoutStorage();
   }
   
   // Check if we should show the banner on this route
@@ -85,22 +82,18 @@ export class WorkoutBannerComponent implements OnInit, OnDestroy {
     console.log(`Banner visibility on ${url}: ${this.isVisibleOnCurrentPage}`);
   }
 
-  private async checkLocalStorage() {
+  // Improved method to check storage
+  private async checkActiveWorkoutStorage() {
     try {
-      const savedSession = await this.storage.getItem('activeWorkoutSession');
-      if (savedSession) {
-        const session = JSON.parse(savedSession);
-        if (session && session.workout && session.workout.workoutId) {
-          this.hasActiveWorkout = true;
-          this.workoutName = session.workout.name || 'Workout';
-          this.workoutId = session.workout.workoutId;
-          console.log(`Active workout found in localStorage: ${this.workoutName} (${this.workoutId})`);
-        }
-      } else {
-        console.log('No active workout in localStorage');
+      const savedSession = await firstValueFrom(this.activeWorkoutService.loadSavedSession());
+      if (!savedSession) {
+        console.log('No active workout in storage');
+        this.hasActiveWorkout = false;
+        this.workoutId = '';
+        this.workoutName = '';
       }
     } catch (error) {
-      console.error('Error checking localStorage:', error);
+      console.error('Error checking workout storage:', error);
     }
   }
 
@@ -126,14 +119,27 @@ export class WorkoutBannerComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Update discard method to more aggressively clean up state
   discardWorkout() {
     if (this.workoutId) {
-      console.log('Discarding workout');
+      console.log('Discarding workout from banner');
+      
+      // Show loading indicator
+      const loadingElement = document.createElement('ion-loading');
+      loadingElement.message = 'Discarding workout...';
+      loadingElement.duration = 1000;
+      document.body.appendChild(loadingElement);
+      loadingElement.present();
+      
+      // Clear the session
       this.activeWorkoutService.clearSavedSession().then(() => {
+        // Explicitly update local state
         this.hasActiveWorkout = false;
         this.workoutId = '';
         this.workoutName = '';
-        console.log('Workout discarded successfully');
+        console.log('Workout discarded successfully from banner');
+      }).catch(error => {
+        console.error('Error discarding workout from banner:', error);
       });
     }
   }

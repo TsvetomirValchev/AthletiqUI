@@ -14,8 +14,6 @@ import { AuthService } from '../services/auth.service';
 export class AuthInterceptor implements HttpInterceptor {
 
   constructor(private authService: AuthService) {}  intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
-
-    console.log('Intercepting request to:', request.url);
     
     const publicEndpoints = [
       '/auth/register',
@@ -29,7 +27,6 @@ export class AuthInterceptor implements HttpInterceptor {
     );
     
     const token = this.authService.getToken();
-    console.log('Token exists:', !!token, 'Is public endpoint:', isPublicEndpoint);
     
     if (token && !isPublicEndpoint) {
       console.log('Adding auth token to request');
