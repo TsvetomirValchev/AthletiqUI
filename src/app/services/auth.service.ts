@@ -114,32 +114,50 @@ export class AuthService {
     );
   }
 
+  /**
+ * Token validation method that expects a raw token string response
+ */
   validateToken(): Observable<boolean> {
     const headers = {
       'Authorization': `Bearer ${this.accessToken}`,
       'X-Client-Type': this.storage.isMobile() ? 'mobile' : 'web'
     };
 
-    return this.http.get<any>(`${this.apiUrl}/validate-token`, { headers })
-      .pipe(
-        map(response => {
-          if (response && response.token) {
-            this.accessToken = response.token;
-            this.saveTokenBasedOnPlatform(response.token);
-            this.saveUserData(response.user || { username: response.username });
-            
-            // Set up refresh for the new token
-            this.setupTokenRefresh(response.token);
-          }
+    return this.http.get(`${this.apiUrl}/validate-token`, { 
+      headers,
+      responseType: 'text'  // Set responseType to text to accept raw string token
+    }).pipe(
+      map(token => {
+        if (token) {
+          // Store the new raw token
+          this.accessToken = token;
+          this.saveTokenBasedOnPlatform(token);
+          
+          // Extract user info from the token
+          const decodedToken = this.decodeToken(token);
+          const userData = {
+            userId: decodedToken?.userId,
+            username: decodedToken?.username,
+            email: decodedToken?.email || ''
+          };
+          
+          this.saveUserData(userData);
+          this.currentUserSubject.next(userData);
+          
+          // Set up refresh for the new token - pass the token parameter
+          this.setupTokenRefresh(token);
           return true;
-        }),
-        catchError(error => {
-          if (!this.storage.isMobile()) {
-            this.logout();
-          }
-          return of(false);
-        })
-      );
+        }
+        return false;
+      }),
+      catchError(error => {
+        console.error('Token validation error:', error);
+        if (!this.storage.isMobile()) {
+          this.logout();
+        }
+        return of(false);
+      })
+    );
   }
 
   private decodeToken(token: string): DecodedToken | null {

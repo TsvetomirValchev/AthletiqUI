@@ -191,12 +191,9 @@ export class WorkoutPage implements OnInit, OnDestroy {
     await toast.present();
   }
 
-  // Modify ionViewWillEnter to be more robust
   ionViewWillEnter() {
     console.log('WorkoutPage: View entering, justLoaded =', this.justLoaded);
-    
-    // Check if workouts are empty or if we haven't just loaded
-    if (this.workouts.length === 0 || !this.justLoaded) {
+        if (this.workouts.length === 0 || !this.justLoaded) {
       console.log('WorkoutPage: Need to reload workouts on view enter');
       this.loadWorkouts();
     } else {
@@ -210,7 +207,6 @@ export class WorkoutPage implements OnInit, OnDestroy {
     this.resetCaches();
     this.workoutService.refreshWorkouts().subscribe({
       next: () => {
-        // Now call load workouts directly instead of relying on the subscription
         this.loadWorkouts();
         event.target.complete();
       },
