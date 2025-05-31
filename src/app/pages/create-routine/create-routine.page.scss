@@ -1,0 +1,625 @@
+// Core variables
+:root {
+  --background-dark: #121212;
+  --card-background: #1e1e1e;
+  --input-background: #252525;
+  --border-color: #333;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --blue-primary: #007bff;
+  --red-primary: #ff3b30;
+  --green-primary: #28a745;
+}
+
+// Base page styles
+.create-routine-page {
+  --background: #121212;
+  --color: white;
+  user-select: none;
+}
+
+// Container layout
+.main-container {
+  display: flex;
+  height: 100%;
+  color: white;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+// Routine container
+.routine-container {
+  flex: 3;
+  overflow-y: auto;
+  padding: 0 16px 20px;
+  padding-bottom: 80px;
+
+  @media (min-width: 769px) {
+    border-right: 1px solid #333;
+  }
+
+  @media (max-width: 768px) {
+    flex: 1;
+    height: 100%;
+    
+    &.library-active {
+      display: none;
+    }
+  }
+}
+
+// Exercise library container
+.library-container {
+  flex: 2;
+  background-color: #121212;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    display: none;
+
+    &.active {
+      display: flex;
+    }
+  }
+}
+
+// Title section
+.title-section {
+  margin-bottom: 24px;
+}
+
+.title-label {
+  color: #aaa;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.title-input {
+  background-color: #1e1e1e;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  padding: 12px;
+  width: 100%;
+  font-size: 18px;
+}
+
+// Exercise cards
+.exercise-card {
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.exercise-header {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px 8px 0 0;
+  
+  .exercise-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 12px;
+    background: #333;
+  }
+  
+  .exercise-title {
+    flex-grow: 1;
+    font-weight: bold;
+    font-size: 16px;
+  }
+  
+  .exercise-handle {
+    display: flex;
+    align-items: center;
+    cursor: grab;
+    color: #666;
+    padding: 0 8px;
+    
+    &:active {
+      cursor: grabbing;
+    }
+  }
+}
+
+// Notes and timer sections
+.notes-section, .timer-section {
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  
+  .section-label {
+    color: #aaa;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  
+  .note-input {
+    background-color: #252525;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    padding: 12px;
+    width: 100%;
+    min-height: 60px;
+    resize: none;
+  }
+}
+
+// Sets section
+.sets-section {
+  padding: 16px;
+}
+
+// Sets header
+.sets-header {
+  display: flex;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #aaa;
+  font-weight: bold;
+  
+  .set-col { width: 40px; text-align: center; }
+  .kg-col, .reps-col { flex: 1; text-align: center; }
+  .remove-col { width: 40px; text-align: center; }
+}
+
+// Set rows
+.set-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  height: 36px;
+  
+  .set-col { 
+    width: 40px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .kg-col, .reps-col { 
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+  
+  .remove-col { 
+    width: 40px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+// Set type selector
+.set-type-select {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background-color: #1e1e1e;
+  color: white;
+  text-align: center;
+  
+  @media (max-width: 768px) {
+    border: none;
+  }
+  
+  @media (min-width: 769px) {
+    border: 1px solid #444;
+  }
+  
+  &::part(icon) {
+    display: none;
+  }
+  
+  &::part(text) {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+  }
+  
+  &.warmup-type { color: #ffa726; }
+  &.dropset-type { color: #7e57c2; }
+  &.failure-type { color: #ef5350; }
+}
+
+// Input styling
+.input-item {
+  --background: transparent;
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  --border-width: 0;
+  --min-height: 36px;
+  margin: 0;
+  
+  &::part(native) {
+    padding: 0;
+    min-height: 36px;
+  }
+}
+
+ion-input {
+  --background: #1e1e1e;
+  --color: white;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --placeholder-color: #666;
+  text-align: center;
+  min-height: 36px;
+  font-size: 16px;
+  margin: 0;
+  
+  @media (max-width: 768px) {
+    border: none;
+  }
+  
+  @media (min-width: 769px) {
+    border: 1px solid #444;
+    border-radius: 4px;
+  }
+}
+
+// Remove button
+.remove-button {
+  background: none;
+  border: none;
+  color: red;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
+}
+
+// Add set button
+.add-set-button {
+  background-color: transparent;
+  color: #0086ff;
+  padding: 8px;
+  width: 100%;
+  text-align: center;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  
+  @media (max-width: 768px) {
+    border: none;
+  }
+  
+  @media (min-width: 769px) {
+    border: 1px solid #444;
+    border-radius: 4px;
+  }
+  
+  ion-icon {
+    margin-right: 8px;
+  }
+}
+
+// Exercise library
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.library-title {
+  font-size: 18px;
+  font-weight: bold;
+  
+  @media (min-width: 769px) {
+    display: none;
+  }
+}
+
+// Desktop library header
+.desktop-library-header {
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  
+  @media (max-width: 768px) {
+    display: none;
+  }
+  
+  .section-title {
+    color: white;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  
+  .subtitle {
+    color: #aaa;
+    font-size: 14px;
+  }
+}
+
+// Search and filters
+.search-bar {
+  margin: 0 16px 16px;
+  background-color: #1e1e1e;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  
+  ion-icon {
+    color: #777;
+    margin-right: 8px;
+  }
+}
+
+.search-input {
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 12px 0;
+  width: 100%;
+  outline: none;
+}
+
+// Updated library filters - single filter only
+.library-filters {
+  padding: 0 16px 16px;
+  display: flex;
+}
+
+.filter-select {
+  background-color: #1e1e1e;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  padding: 10px;
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5H7z' fill='%23777'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 30px;
+}
+
+// Exercise list
+.exercise-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px;
+}
+
+.exercise-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #252525;
+  }
+  
+  .exercise-item-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 12px;
+    background: #333;
+  }
+  
+  .exercise-item-details {
+    flex: 1;
+  }
+  
+  .exercise-item-name {
+    font-weight: 500;
+  }
+  
+  .exercise-item-target {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 4px;
+  }
+}
+
+// Add exercise button for mobile
+.add-exercise-button-container {
+  margin-top: 16px;
+  padding: 0 16px 16px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  
+  @media (min-width: 769px) {
+    display: none;
+  }
+  
+  .add-exercise-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    cursor: pointer;
+    
+    ion-icon {
+      margin-right: 8px;
+      font-size: 20px;
+    }
+  }
+}
+
+// Action buttons
+.routine-action-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 20px 16px;
+  
+  @media (min-width: 769px) {
+    max-width: 500px;
+    margin: 20px auto;
+  }
+  
+  .save-button, .discard-button {
+    flex: 1;
+    padding: 12px 16px;
+    font-size: 16px;
+    font-weight: 500;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    
+    ion-icon {
+      margin-right: 8px;
+      font-size: 20px;
+    }
+  }
+  
+  .save-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+  }
+  
+  .save-button:disabled {
+    background-color: #505050;  /* Gray background */
+    color: #aaaaaa;             /* Light gray text */
+    opacity: 0.7;               /* Slightly transparent */
+    cursor: not-allowed;        /* Show not-allowed cursor */
+  }
+  
+  .discard-button {
+    background-color: transparent;
+    color: #ff3b30;
+    border: 1px solid #ff3b30;
+  }
+}
+
+// Empty state
+.empty-state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #aaa;
+  position: absolute;
+  top: 150px;
+  left: 0;
+  right: 50%;
+  bottom: 0;
+  
+  @media (max-width: 768px) {
+    right: 0;
+    padding: 20% 32px;
+  }
+  
+  ion-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: #555;
+  }
+  
+  .empty-title {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: white;
+  }
+  
+  .empty-subtitle {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  
+  .add-first-exercise-btn {
+    background-color: #0078ff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 250px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    
+    @media (min-width: 769px) {
+      display: none;
+    }
+    
+    ion-icon {
+      margin-right: 8px;
+      font-size: 20px;
+      color: white;
+      margin-bottom: 0;
+    }
+  }
+  
+  .discard-routine-btn {
+    background-color: #ff3b30;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 250px;
+    cursor: pointer;
+    
+    ion-icon {
+      margin-right: 8px;
+      font-size: 20px;
+      color: white;
+      margin-bottom: 0;
+    }
+  }
+}

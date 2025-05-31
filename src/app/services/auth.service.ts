@@ -1,10 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { Observable, of, BehaviorSubject, from } from 'rxjs';
-import { map, catchError, tap, switchMap } from 'rxjs/operators';
+import { Observable, of, BehaviorSubject, from, throwError } from 'rxjs';
+import { map, catchError, tap, switchMap, take } from 'rxjs/operators';
 import { StorageService } from './storage.service';
-import { Platform } from '@ionic/angular';
 import { DecodedToken } from '../models/token.model';
 
 @Injectable({
@@ -16,11 +15,11 @@ export class AuthService {
   public currentUser$ = this.currentUserSubject.asObservable();
   
   private accessToken: string | null = null;
+  private tokenRefreshTimeout: any;
 
   constructor(
     private http: HttpClient,
     private storage: StorageService,
-    private platform: Platform
   ) {
     this.checkAuthentication();
   }
@@ -115,30 +114,50 @@ export class AuthService {
     );
   }
 
+  /**
+ * Token validation method that expects a raw token string response
+ */
   validateToken(): Observable<boolean> {
     const headers = {
       'Authorization': `Bearer ${this.accessToken}`,
       'X-Client-Type': this.storage.isMobile() ? 'mobile' : 'web'
     };
 
-    return this.http.get<any>(`${this.apiUrl}/validate-token`, { headers })
-      .pipe(
-        map(response => {
-          // Refresh the token on success
-          if (response && response.token) {
-            this.accessToken = response.token;
-            this.saveTokenBasedOnPlatform(response.token);
-            this.saveUserData(response.user || { username: response.username });
-          }
+    return this.http.get(`${this.apiUrl}/validate-token`, { 
+      headers,
+      responseType: 'text'  // Set responseType to text to accept raw string token
+    }).pipe(
+      map(token => {
+        if (token) {
+          // Store the new raw token
+          this.accessToken = token;
+          this.saveTokenBasedOnPlatform(token);
+          
+          // Extract user info from the token
+          const decodedToken = this.decodeToken(token);
+          const userData = {
+            userId: decodedToken?.userId,
+            username: decodedToken?.username,
+            email: decodedToken?.email || ''
+          };
+          
+          this.saveUserData(userData);
+          this.currentUserSubject.next(userData);
+          
+          // Set up refresh for the new token - pass the token parameter
+          this.setupTokenRefresh(token);
           return true;
-        }),
-        catchError(error => {
-          if (!this.storage.isMobile()) {
-            this.logout();
-          }
-          return of(false);
-        })
-      );
+        }
+        return false;
+      }),
+      catchError(error => {
+        console.error('Token validation error:', error);
+        if (!this.storage.isMobile()) {
+          this.logout();
+        }
+        return of(false);
+      })
+    );
   }
 
   private decodeToken(token: string): DecodedToken | null {
@@ -165,16 +184,25 @@ export class AuthService {
         this.accessToken = token;
         
         const decodedToken = this.decodeToken(token);
-        const userId = decodedToken?.userId || decodedToken?.sub;
+        
+        // Extract user information from token claims
+        const userId = decodedToken?.userId || decodedToken?.sub || 'unknown';
+        const username = decodedToken?.username || decodedToken?.sub || 'User';
+        const email = decodedToken?.email || '';
         
         this.saveTokenBasedOnPlatform(token);
         
+        // Store both username and email in userData
         const userData = { 
-          username: usernameOrEmail,
+          username: username,  // Use actual username from token
+          email: email,        // Store email for use in profile/settings
           userId: userId
         };
         this.saveUserData(userData);
         this.currentUserSubject.next(userData);
+
+        // Set up refresh mechanism for the new token
+        this.setupTokenRefresh(token);
       })
     );
   }
@@ -213,6 +241,11 @@ export class AuthService {
   }
 
   logout(): Observable<any> {
+    if (this.tokenRefreshTimeout) {
+      clearTimeout(this.tokenRefreshTimeout);
+      this.tokenRefreshTimeout = null;
+    }
+    
     this.accessToken = null;
     this.currentUserSubject.next(null);
     
@@ -252,16 +285,120 @@ export class AuthService {
   }
 
   // Add this to your auth.service.ts to check token validity
-isTokenExpired(): boolean {
-  const token = this.getToken();
-  if (!token) return true;
-  
-  const decodedToken = this.decodeToken(token);
-  if (!decodedToken?.exp) return true;
-  
-  const expirationDate = new Date(0);
-  expirationDate.setUTCSeconds(decodedToken.exp);
-  
-  return expirationDate.valueOf() <= new Date().valueOf();
-}
+  isTokenExpired(): boolean {
+    const token = this.getToken();
+    if (!token) return true;
+    
+    const decodedToken = this.decodeToken(token);
+    if (!decodedToken?.exp) return true;
+    
+    const expirationDate = new Date(0);
+    expirationDate.setUTCSeconds(decodedToken.exp);
+    
+    return expirationDate.valueOf() <= new Date().valueOf();
+  }
+
+  // Add this method to setup token refresh before expiration
+  private setupTokenRefresh(token: string): void {
+    // Clear any existing timeout
+    if (this.tokenRefreshTimeout) {
+      clearTimeout(this.tokenRefreshTimeout);
+    }
+    
+    // For web clients, set up a refresh mechanism before token expires
+    if (!this.storage.isMobile()) {
+      const decodedToken = this.decodeToken(token);
+      if (!decodedToken?.exp) return;
+      
+      const expirationDate = new Date(0);
+      expirationDate.setUTCSeconds(decodedToken.exp);
+      
+      // Calculate time until token expires (in ms)
+      const timeUntilExpiry = expirationDate.valueOf() - new Date().valueOf();
+      
+      // Refresh at 80% of token lifetime (about 24 minutes for a 30-minute token)
+      const refreshTime = Math.max(timeUntilExpiry * 0.8, 60000);
+      
+      console.log(`Token will be refreshed in ${Math.round(refreshTime / 60000)} minutes`);
+      
+      this.tokenRefreshTimeout = setTimeout(() => {
+        console.log('Auto-refreshing token before expiration');
+        this.validateToken().subscribe({
+          next: () => console.log('Token refreshed successfully'),
+          error: (err) => console.error('Failed to refresh token', err)
+        });
+      }, refreshTime);
+    }
+  }
+
+  // Add this method after isTokenExpired()
+  checkAndRefreshTokenIfNeeded(): Observable<boolean> {
+    if (!this.accessToken) {
+      return of(false);
+    }
+    
+    // If token is expired or about to expire (less than 5 minutes left)
+    if (this.isTokenAboutToExpire()) {
+      console.log('Token is about to expire, refreshing...');
+      return this.validateToken();
+    }
+    
+    return of(true);
+  }
+
+  // Add this helper method
+  isTokenAboutToExpire(minuteThreshold: number = 5): boolean {
+    const token = this.getToken();
+    if (!token) return true;
+    
+    const decodedToken = this.decodeToken(token);
+    if (!decodedToken?.exp) return true;
+    
+    const expirationDate = new Date(0);
+    expirationDate.setUTCSeconds(decodedToken.exp);
+    
+    // Check if token will expire within the threshold minutes
+    const expiryTimeMs = expirationDate.valueOf() - new Date().valueOf();
+    const thresholdMs = minuteThreshold * 60 * 1000;
+    
+    return expiryTimeMs <= thresholdMs;
+  }
+
+  // Add this method to your AuthService class
+  deleteAccount(): Observable<any> {
+    // Check if we have a user ID from the current user
+    return this.currentUser$.pipe(
+      take(1),
+      switchMap(user => {
+        if (!user || !user.userId) {
+          return throwError(() => new Error('No authenticated user found'));
+        }
+        
+        console.log(`Attempting to delete account for user: ${user.userId}`);
+        
+        return this.http.delete(`${this.apiUrl}/delete/${user.userId}`).pipe(
+          tap(() => {
+            console.log('Account deleted successfully');
+            // After successful deletion, perform logout cleanup
+            if (this.tokenRefreshTimeout) {
+              clearTimeout(this.tokenRefreshTimeout);
+              this.tokenRefreshTimeout = null;
+            }
+            
+            this.accessToken = null;
+            this.currentUserSubject.next(null);
+            
+            // Clear storage
+            this.storage.removeItem('mobileAuthToken');
+            this.storage.removeItem('webAuthToken');
+            this.storage.removeItem('userData');
+          }),
+          catchError(error => {
+            console.error('Error deleting account:', error);
+            return throwError(() => error);
+          })
+        );
+      })
+    );
+  }
 }

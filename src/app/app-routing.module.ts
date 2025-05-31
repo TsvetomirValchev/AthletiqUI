@@ -5,34 +5,53 @@ import { authGuard } from './guards/auth.guard';
 const routes: Routes = [
   {
     path: 'login',
-    loadChildren: () => import('./login/login.module').then(m => m.LoginPageModule)
+    loadChildren: () => import('./pages/login/login.module').then(m => m.LoginPageModule)
   },
   {
     path: 'register',
-    loadChildren: () => import('./register/register.module').then(m => m.RegisterPageModule)
+    loadChildren: () => import('./pages/register/register.module').then(m => m.RegisterPageModule)
   },
   {
     path: 'reset-password',
-    loadChildren: () => import('./reset-password/reset-password.module').then(m => m.ResetPasswordPageModule)
+    loadChildren: () => import('./pages/reset-password/reset-password.module').then(m => m.ResetPasswordPageModule)
   },
   {
     path: 'forgot-password',
-    loadChildren: () => import('./forgot-password/forgot-password.module').then(m => m.ForgotPasswordPageModule)
+    loadChildren: () => import('./pages/forgot-password/forgot-password.module').then(m => m.ForgotPasswordPageModule)
   },
   {
-    path: 'tabs',
-    loadChildren: () => import('./tabs/tabs.module').then(m => m.TabsPageModule),
+    path: 'active-workout/:id',
+    loadComponent: () => import('./pages/active-workout/active-workout.page').then(m => m.ActiveWorkoutPage),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'active-workout/empty',
+    loadComponent: () => import('./pages/active-workout/active-workout.page').then(m => m.ActiveWorkoutPage),
     canActivate: [authGuard]
   },
   {
     path: 'active-workout',
-    loadChildren: () => import('./active-workout/active-workout.module').then(m => m.ActiveWorkoutPageModule),
+    loadChildren: () => import('./pages/active-workout/active-workout.module').then(m => m.ActiveWorkoutPageModule),
     canActivate: [authGuard]
   },
   {
     path: 'settings',
-    loadChildren: () => import('./settings/settings.module').then(m => m.SettingsPageModule),
+    loadChildren: () => import('./pages/settings/settings.module').then(m => m.SettingsPageModule),
     canActivate: [authGuard]
+  },
+  {
+    path: 'create-routine',
+    loadComponent: () => import('./pages/create-routine/create-routine.page').then(m => m.CreateRoutinePage),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'browse-exercises',
+    loadComponent: () => import('./pages/browse-exercises/browse-exercises.page').then(m => m.BrowseExercisesPage),
+    canActivate: [authGuard]
+  },
+  {
+    path: 'exercise-templates',
+    loadChildren: () => import('./pages/exercise-templates/exercise-templates.module').then( m => m.ExerciseTemplatesPageModule)
   },
   {
     path: '',
@@ -40,29 +59,10 @@ const routes: Routes = [
     pathMatch: 'full'
   },
   {
-    path: 'create-routine',
-    loadComponent: () => import('./create-routine/create-routine.page').then(m => m.CreateRoutinePage),
+    path: 'tabs',
+    loadChildren: () => import('./tabs/tabs.module').then(m => m.TabsPageModule),
     canActivate: [authGuard]
-  },
-  {
-    path: 'browse-exercises',
-    loadComponent: () => import('./browse-exercises/browse-exercises.page').then(m => m.BrowseExercisesPage),
-    canActivate: [authGuard]
-  },
-  {
-    path: 'active-workout',
-    loadChildren: () => import('./pages/active-workout/active-workout.module').then( m => m.ActiveWorkoutPageModule)
-  },
-  {
-    path: 'workout-history',
-    loadChildren: () => import('./pages/workout-history/workout-history.module').then( m => m.WorkoutHistoryPageModule)
-  },
-  {
-    path: 'exercise-templates',
-    loadChildren: () => import('./pages/exercise-templates/exercise-templates.module').then( m => m.ExerciseTemplatesPageModule)
-  },
-
-
+  }
 ];
 
 @NgModule({

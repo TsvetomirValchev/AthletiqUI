@@ -1,0 +1,243 @@
+// Statistics Page Styling
+
+// Loading and error containers
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  
+  ion-icon {
+    font-size: 48px;
+    color: var(--ion-color-medium);
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    color: var(--ion-color-medium);
+    margin-bottom: 1rem;
+  }
+}
+
+// Statistics container
+.statistics-container {
+  padding: 16px;
+}
+
+// Stats overview
+.stats-overview {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  
+  .stat-item {
+    text-align: center;
+    
+    .stat-value {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: bold;
+      color: var(--ion-color-primary);
+      
+      ion-icon {
+        margin-right: 4px;
+      }
+      
+      .emoji {
+        margin-right: 4px;
+        font-size: 24px;
+      }
+    }
+    
+    .stat-label {
+      font-size: 14px;
+      color: var(--ion-color-medium);
+      margin-top: 4px;
+    }
+  }
+}
+
+// Calendar styling
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// Custom Calendar Styling
+.custom-calendar {
+  width: 100%;
+  margin: 0 auto;
+  
+  // Media query for larger screens (tablets and desktops)
+  @media (min-width: 768px) {
+    max-width: 600px; // Limit the maximum width on larger screens
+    margin: 0 auto; // Center the calendar
+    
+    // Optionally make the calendar days smaller
+    .calendar-grid {
+      gap: 4px; // Reduce gap between days
+      
+      .calendar-day {
+        font-size: 14px; // Smaller text
+        
+        &::before {
+          width: 28px; // Smaller circles for date indicators
+          height: 28px;
+        }
+      }
+    }
+  }
+  
+  // For even larger screens (desktop monitors)
+  @media (min-width: 1200px) {
+    max-width: 500px; // Even more compact on very large screens
+  }
+  
+  .calendar-header-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    margin-bottom: 8px;
+    
+    .calendar-header-cell {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ion-color-medium);
+      padding: 8px 0;
+    }
+  }
+  
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    
+    .calendar-day {
+      position: relative;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        background-color: rgba(var(--ion-color-primary-rgb), 0.1);
+      }
+      
+      &.outside-month {
+        color: var(--ion-color-medium-shade);
+        opacity: 0.5;
+      }
+      
+      &.today {
+        // Remove the existing blue border
+        border: none;
+        // Use position relative for the positioning context
+        position: relative;
+        // Make text white for contrast against blue background
+        color: white;
+        
+        // Create a blue circle behind the number using a pseudo-element
+        &::before {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 32px; // Same size as workout circle
+          height: 32px; // Same size as workout circle
+          background-color: var(--ion-color-primary); // Blue background
+          border-radius: 50%;
+          z-index: -1; // Place behind the text
+        }
+      }
+      
+      // Add special styling for days that are both today AND have a workout
+      &.today.has-workout {
+        // Make text white for contrast
+        color: white;
+        
+        // Create a split-color circle or gradient
+        &::before {
+          background: linear-gradient(135deg, var(--ion-color-primary) 50%, #ff3b30 50%);
+        }
+      }
+      
+      &.selected {
+        // Remove all special styling to make it look like a regular date
+        background-color: transparent;
+        color: inherit;
+        border: none;
+      }
+      
+      &.has-workout {
+        // Use position relative for the positioning context
+        position: relative;
+        // Remove background color and border
+        background-color: transparent;
+        border: none;
+        color: white; // Keep text white for contrast
+        
+        // Create a larger circle behind the number using a pseudo-element
+        &::before {
+          content: "";
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 32px; // Larger circle for better visibility
+          height: 32px; // Larger circle for better visibility
+          background-color: #ff3b30; // Red background
+          border-radius: 50%;
+          z-index: -1; // Place behind the text
+        }
+        
+        // Keep the small fire emoji in the bottom right
+        &::after {
+          content: "🔥";
+          position: absolute;
+          bottom: -2px;
+          right: -2px;
+          font-size: 10px; // Small emoji
+        }
+      }
+    }
+  }
+}
+
+// Day details
+.day-no-workouts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  
+  ion-icon {
+    font-size: 64px;
+    color: var(--ion-color-medium);
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    color: var(--ion-color-medium);
+    margin-bottom: 1rem;
+  }
+}
+
+// Add custom styles for the muscle group chart card
+ion-card:has(app-muscle-group-chart) {
+  margin: 16px;
+  --background: #121212;
+  border-radius: 12px;
+}

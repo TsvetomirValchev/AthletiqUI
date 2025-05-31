@@ -35,3 +35,26 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import "@ionic/angular/css/palettes/dark.system.css";
+
+/* Calendar size reduction */
+ion-datetime {
+  --ion-color-primary: var(--ion-color-primary);
+  max-width: 350px;
+  margin: auto;
+  
+  /* Make the calendar controls smaller */
+  --ion-datetime-calendar-height: 300px;
+  --ion-datetime-calendar-day-padding: 4px;
+}
+
+/* Make month/year header smaller */
+ion-datetime .datetime-header {
+  padding: 10px;
+  font-size: 14px;
+}
+
+/* Make day cells smaller */
+ion-datetime .calendar-day {
+  font-size: 12px;
+  padding: 2px;
+}

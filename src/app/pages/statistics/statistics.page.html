@@ -1,0 +1,111 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title class="ion-text-center">Statistics</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/settings">
+        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <!-- Loading indicator -->
+  <div *ngIf="isLoading" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading statistics...</p>
+  </div>
+
+  <!-- Error message -->
+  <div *ngIf="error" class="error-container">
+    <ion-icon name="warning-outline"></ion-icon>
+    <p>{{ error }}</p>
+    <ion-button (click)="loadStatistics()" size="small">
+      Retry
+    </ion-button>
+  </div>
+
+  <!-- Statistics Content -->
+  <div *ngIf="!isLoading" class="statistics-container">
+    <!-- Workout Streaks Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Workout Streaks</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="stats-overview">
+          <div class="stat-item">
+            <div class="stat-value">
+              <span class="emoji">🔥</span> {{ workoutStreak.currentStreak }}
+            </div>
+            <div class="stat-label">Hot Streak</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">
+              <span class="emoji">🌙</span> {{ daysSinceLastWorkout }}
+            </div>
+            <div class="stat-label">Rest Days</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">
+              <ion-icon name="time"></ion-icon> {{ workoutStats.hoursActive }}
+            </div>
+            <div class="stat-label">Hours Active</div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Custom Workout Calendar Card -->
+    <ion-card>
+      <ion-card-header>
+        <div class="calendar-header">
+          <ion-button fill="clear" (click)="previousMonth()">
+            <ion-icon slot="icon-only" name="chevron-back"></ion-icon>
+          </ion-button>
+          <ion-card-title>{{ currentMonth | date:'MMMM yyyy' }}</ion-card-title>
+          <ion-button fill="clear" (click)="nextMonth()">
+            <ion-icon slot="icon-only" name="chevron-forward"></ion-icon>
+          </ion-button>
+        </div>
+      </ion-card-header>
+      <ion-card-content>
+        <!-- Custom Calendar Implementation -->
+        <div class="custom-calendar">
+          <!-- Weekday Headers -->
+          <div class="calendar-header-row">
+            <div *ngFor="let day of weekDays" class="calendar-header-cell">
+              {{ day }}
+            </div>
+          </div>
+          
+          <!-- Calendar Grid -->
+          <div class="calendar-grid">
+            <div 
+              *ngFor="let day of calendarDays"
+              class="calendar-day"
+              [class.outside-month]="!day.isCurrentMonth"
+              [class.has-workout]="day.hasWorkout"
+              [class.today]="day.isToday"
+              [class.selected]="day.isSelected"
+              (click)="selectDate(day)"
+            >
+              <span class="day-number">{{ day.date.getDate() }}</span>
+              <span *ngIf="day.hasWorkout" class="workout-indicator"></span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Muscle Group Focus Chart Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Muscle Group Focus</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <app-muscle-group-chart></app-muscle-group-chart>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

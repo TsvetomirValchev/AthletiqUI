@@ -1,0 +1,17 @@
+<div class="workout-banner" *ngIf="hasActiveWorkout && isVisibleOnCurrentPage">
+  <div class="banner-content">
+    <div class="workout-status">
+      <span class="status-dot"></span>
+      <span class="status-text">Workout in Progress</span>
+    </div>
+    <div class="workout-name">{{ workoutName || 'Workout' }}</div>
+    <div class="banner-actions">
+      <button class="resume-btn" (click)="resumeWorkout()">
+        <ion-icon name="play-outline"></ion-icon> Resume
+      </button>
+      <button class="discard-btn" (click)="discardWorkout()">
+        <ion-icon name="close-outline"></ion-icon> Discard
+      </button>
+    </div>
+  </div>
+</div>
