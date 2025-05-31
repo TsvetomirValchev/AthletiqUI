@@ -707,4 +707,75 @@ private reindexTempExerciseSets() {
     return matchesMuscle && matchesSearch;
   });
 }
+
+// Fixed updateSetValue method to properly update sets in edit routine flow
+updateSetValue(exerciseIndex: number, setIndex: number, property: string, event: any) {
+  if (exerciseIndex < 0 || exerciseIndex >= this.exercises.length) return;
+  
+  const exercise = this.exercises[exerciseIndex];
+  if (!exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
+  
+  const set = exercise.sets[setIndex];
+  const value = Number(event.detail.value);
+  
+  // Update the value locally first for immediate UI feedback
+  switch(property) {
+    case 'reps':
+      set.reps = value;
+      break;
+    case 'weight':
+      set.weight = value;
+      break;
+    case 'restTimeSeconds':
+      set.restTimeSeconds = value;
+      break;
+    case 'type':
+      set.type = event.detail.value; // Don't convert type to number
+      break;
+    default:
+      console.warn(`Unknown property: ${property}`);
+      return;
+  }
+  
+  // Get current workout ID
+  const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
+  
+  // Skip backend calls when:
+  // 1. No workout ID (creating new routine)
+  // 2. No exercise ID (newly added exercise)
+  // 3. No set ID (newly added set)
+  if (!workoutId || !exercise.exerciseId || !set.exerciseSetId) {
+    console.log(`Skipping backend update for ${property}=${value} (local only)`);
+    return;
+  }
+  
+  // For real sets with real IDs, update via the backend API
+  const setPayload = {
+    exerciseSetId: set.exerciseSetId,
+    exerciseId: exercise.exerciseId,
+    type: set.type || 'NORMAL',
+    reps: set.reps || 0,
+    weight: set.weight || 0,
+    restTimeSeconds: set.restTimeSeconds || 0,
+    orderPosition: set.orderPosition || 0
+  };
+  
+  console.log(`Updating ${property} for set ${set.exerciseSetId} to ${value}`);
+  
+  // Call the backend using the endpoint
+  this.workoutService.updateExerciseSet(
+    workoutId,
+    exercise.exerciseId,
+    set.exerciseSetId,
+    setPayload
+  ).subscribe({
+    next: () => {
+      console.log(`Successfully updated ${property} for set ${set.exerciseSetId}`);
+    },
+    error: (error) => {
+      console.error(`Error updating ${property} for set:`, error);
+      this.showToast(`Failed to update ${property}`);
+    }
+  });
+}
 }

@@ -103,29 +103,25 @@
                 </div>
                 <div class="kg-col">
                   <ion-item lines="none" class="input-item">
-                    <ion-input type="number" 
-                      [(ngModel)]="set.weight" 
-                      [ngModelOptions]="{standalone: true}"
-                      min="0" 
+                    <ion-input
+                      type="number"
+                      [value]="set.weight"
+                      (ionChange)="updateSetValue(exerciseIndex, setIndex, 'weight', $event)"
                       inputmode="decimal"
                       min="0"
-                      placeholder="0"
-                      class="kg-input"
-                      (ionChange)="enforceMinimumValue(set, 'weight', 0)">
+                      placeholder="0">
                     </ion-input>
                   </ion-item>
                 </div>
                 <div class="reps-col">
                   <ion-item lines="none" class="input-item">
-                    <ion-input type="number" 
-                      [(ngModel)]="set.reps" 
-                      [ngModelOptions]="{standalone: true}"
-                      min="0" 
+                    <ion-input
+                      type="number"
+                      [value]="set.reps"
+                      (ionChange)="updateSetValue(exerciseIndex, setIndex, 'reps', $event)"
                       inputmode="numeric"
                       min="0"
-                      placeholder="0"
-                      class="reps-input"
-                      (ionChange)="enforceMinimumValue(set, 'reps', 0)">
+                      placeholder="0">
                     </ion-input>
                   </ion-item>
                 </div>

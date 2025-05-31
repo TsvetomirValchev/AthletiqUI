@@ -194,7 +194,7 @@ ion-reorder-group {
   }
 }
 
-// Set type selector
+// Set type selector - improved styling
 .set-type-select {
   width: 36px;
   height: 36px;
@@ -222,11 +222,41 @@ ion-reorder-group {
     justify-content: center;
     align-items: center;
     font-weight: bold;
+    
+    // Force only the first character to be visible when collapsed
+    max-width: 15px;
+    text-overflow: clip;
+    white-space: nowrap;
+    overflow: hidden;
   }
   
   &.warmup-type { color: #ffa726; }
   &.dropset-type { color: #7e57c2; }
   &.failure-type { color: #ef5350; }
+  &.normal-type { color: white; }
+}
+
+// Create a custom class for the popover to ensure full text is visible there
+::ng-deep .set-type-popover ion-select-option {
+  white-space: nowrap;
+  width: 100%;
+  display: block;
+}
+
+// Target select popover specifically to style options
+::ng-deep .select-interface-popover {
+  --width: 200px;
+  
+  .select-interface-option {
+    --padding-start: 10px;
+    --padding-end: 10px;
+    font-size: 14px;
+    
+    &.normal-type { color: white; }
+    &.warmup-type { color: #ffa726; }
+    &.dropset-type { color: #7e57c2; }
+    &.failure-type { color: #ef5350; }
+  }
 }
 
 // Input styling

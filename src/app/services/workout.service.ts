@@ -9,6 +9,7 @@ import { ExerciseSet } from '../models/exercise-set.model';
 import { ExerciseTemplateService } from './exercise-template.service';
 import { ExerciseTemplate } from '../models/exercise-template.model';
 import { ActiveWorkoutService } from './active-workout.service';
+import { SetType } from '../models/set-type.enum';
 
 @Injectable({
   providedIn: 'root'
@@ -505,37 +506,130 @@ export class WorkoutService implements OnDestroy {
         // Process each exercise sequentially
         return from(exercises).pipe(
           concatMap(exercise => {
-            if (exercise.exerciseId) {
-              // For existing exercises, send the complete exercise WITH its sets
-              console.log(`Updating exercise ${exercise.name} (${exercise.exerciseId}) with ${exercise.sets?.length || 0} sets`);
+            // Check if this is a real exercise ID or a temporary ID
+            const isRealExerciseId = exercise.exerciseId && 
+              !exercise.exerciseId.toString().startsWith('temp-') && 
+              !exercise.tempId;
+            
+            if (isRealExerciseId) {
+              // For existing exercises, update the exercise first
+              console.log(`Updating existing exercise ${exercise.name} (${exercise.exerciseId})`);
               
-              // Prepare the payload with sets ordered correctly
-              const exercisePayload = {
-                ...exercise,
-                sets: exercise.sets?.map((set, index) => ({
-                  ...set,
-                  orderPosition: index // Ensure correct ordering
-                }))
-              };
+              // Create a payload without sets for the exercise update
+              const { sets, ...exerciseWithoutSets } = exercise;
               
-              // Send the complete exercise with sets to backend
+              // Update the exercise first
               return this.http.put<Exercise>(
                 `${this.apiUrl}/${workout.workoutId}/exercises/${exercise.exerciseId}`, 
-                exercisePayload
+                exerciseWithoutSets
               ).pipe(
+                // Then handle sets separately using the appropriate endpoints
+                switchMap(updatedExercise => {
+                  console.log(`Updated exercise ${exercise.name} (ID: ${exercise.exerciseId})`);
+                  if (!exercise.sets || exercise.sets.length === 0) {
+                    return of(updatedExercise);
+                  }
+                  
+                  // Process each set separately using the sets endpoint
+                  console.log(`Processing ${exercise.sets.length} sets for existing exercise ${exercise.exerciseId}`);
+                  
+                  return from(exercise.sets).pipe(
+                    concatMap((set, index) => {
+                      // Make sure each set has correct orderPosition
+                      const setWithOrderPosition = {
+                        ...set,
+                        exerciseId: exercise.exerciseId,
+                        orderPosition: index
+                      };
+                      
+                      // Remove properties that shouldn't be sent
+                      const { tempId, completed, ...cleanSet } = setWithOrderPosition;
+                      
+                      // If the set has an ID, update it, otherwise create a new one
+                      if (set.exerciseSetId && !set.exerciseSetId.toString().startsWith('temp-')) {
+                        console.log(`Updating existing set ${set.exerciseSetId}`);
+                        return this.http.put<ExerciseSet>(
+                          `${this.apiUrl}/${workout.workoutId}/exercises/${exercise.exerciseId}/sets/${set.exerciseSetId}`, 
+                          cleanSet
+                        ).pipe(
+                          catchError(error => {
+                            console.error(`Error updating set ${set.exerciseSetId}:`, error);
+                            return of(null); // Continue with other sets even if one fails
+                          })
+                        );
+                      } else {
+                        console.log(`Creating new set for existing exercise ${exercise.exerciseId}`);
+                        return this.http.post<ExerciseSet>(
+                          `${this.apiUrl}/${workout.workoutId}/exercises/${exercise.exerciseId}/sets`, 
+                          cleanSet
+                        ).pipe(
+                          catchError(error => {
+                            console.error('Error creating set:', error);
+                            return of(null); // Continue with other sets even if one fails
+                          })
+                        );
+                      }
+                    }),
+                    toArray(),
+                    map(() => updatedExercise)
+                  );
+                }),
                 catchError(error => {
-                  console.error(`Error updating exercise ${exercise.name}:`, error);
+                  console.error(`Error processing exercise ${exercise.name}:`, error);
                   return throwError(() => error);
                 })
               );
             } else {
-              // For new exercises
-              console.log(`Creating new exercise ${exercise.name} with ${exercise.sets?.length || 0} sets`);
+              // This is a new exercise (either no ID or temporary ID)
+              console.log(`Creating new exercise ${exercise.name} (temp: ${exercise.tempId || 'none'})`);
               
+              // Extract sets to handle separately
+              const { sets, tempId, exerciseId, ...exerciseWithoutTempFields } = exercise;
+              const exerciseSets = sets || [];
+              
+              // Create the exercise first without sets or temp fields
               return this.http.post<Exercise>(
                 `${this.apiUrl}/${workout.workoutId}/exercises`, 
-                exercise  // Send complete exercise with sets
+                exerciseWithoutTempFields
               ).pipe(
+                switchMap(createdExercise => {
+                  console.log(`Created new exercise with ID ${createdExercise.exerciseId}`);
+                  if (exerciseSets.length === 0) {
+                    return of(createdExercise);
+                  }
+                  
+                  // Now create each set using the dedicated endpoint
+                  console.log(`Creating ${exerciseSets.length} sets for new exercise ${createdExercise.exerciseId}`);
+                  
+                  return from(exerciseSets).pipe(
+                    concatMap((set, index) => {
+                      // Prepare set with the new exercise ID and correct order
+                      const newSet = {
+                        type: set.type || 'NORMAL',
+                        reps: set.reps || 0,
+                        weight: set.weight || 0,
+                        restTimeSeconds: set.restTimeSeconds || 60,
+                        exerciseId: createdExercise.exerciseId,
+                        orderPosition: index
+                      };
+                      
+                      console.log(`Creating set ${index} for new exercise ${createdExercise.exerciseId}:`, newSet);
+                      
+                      return this.http.post<ExerciseSet>(
+                        `${this.apiUrl}/${workout.workoutId}/exercises/${createdExercise.exerciseId}/sets`, 
+                        newSet
+                      ).pipe(
+                        tap(response => console.log(`Created set response:`, response)),
+                        catchError(error => {
+                          console.error('Error creating set for new exercise:', error);
+                          return of(null); // Continue with other sets even if one fails
+                        })
+                      );
+                    }),
+                    toArray(),
+                    map(() => createdExercise)
+                  );
+                }),
                 catchError(error => {
                   console.error(`Error creating exercise ${exercise.name}:`, error);
                   return throwError(() => error);
@@ -561,5 +655,23 @@ export class WorkoutService implements OnDestroy {
   // Add this method to WorkoutService
   updateExercise(workoutId: string, exerciseId: string, exerciseDTO: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/workouts/${workoutId}/exercises/${exerciseId}`, exerciseDTO);
+  }
+
+  updateExerciseSet(
+    workoutId: string, 
+    exerciseId: string, 
+    setId: string, 
+    setData: any
+  ): Observable<any> {
+    return this.http.put<any>(
+      `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets/${setId}`,
+      setData
+    ).pipe(
+      tap(() => console.log(`Set ${setId} updated successfully`)),
+      catchError(error => {
+        console.error(`Error updating set ${setId}:`, error);
+        return throwError(() => new Error('Failed to update set'));
+      })
+    );
   }
 }

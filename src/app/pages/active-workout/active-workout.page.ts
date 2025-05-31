@@ -4,7 +4,7 @@ import { IonicModule, AlertController, ToastController, LoadingController, Actio
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { finalize, take } from 'rxjs/operators';
+import { finalize, switchMap, take } from 'rxjs/operators';
 
 import { ActiveWorkoutService } from '../../services/active-workout.service';
 import { WorkoutService } from '../../services/workout.service';
@@ -236,45 +236,171 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     return set?.completed || false;
   }
 
-  // Update set weight
-  updateSetWeight(set: ExerciseSet, event: any) {
+  // Update set weight - convert to use indexes
+  updateSetWeight(exercise: Exercise, setIndex: number, event: any) {
+    if (!exercise || (!exercise.exerciseId && !exercise.tempId) || !exercise.sets) return;
+    if (setIndex < 0 || setIndex >= exercise.sets.length) return;
+    
     const newWeight = Number(event.detail.value);
     if (isNaN(newWeight)) return;
     
     // Update locally first for immediate UI feedback
-    set.weight = newWeight;
+    exercise.sets[setIndex].weight = newWeight;
     
-    // Update in service (local only)
-    if (set.exerciseSetId) {
-      this.activeWorkoutService.updateSetWeight(set.exerciseSetId, newWeight);
-    }
+    // Use either real ID or temp ID
+    const exerciseId = exercise.exerciseId || exercise.tempId;
+    
+    if (!exerciseId) return;
+    
+    // Update in service using the index-based method
+    this.activeWorkoutService.updateSetPropertyByIndex(
+      exerciseId,
+      setIndex,
+      'weight',
+      newWeight
+    );
   }
 
-  // Update set reps
-  updateSetReps(set: ExerciseSet, event: any) {
+  // Update set reps - convert to use indexes
+  updateSetReps(exercise: Exercise, setIndex: number, event: any) {
+    if (!exercise || (!exercise.exerciseId && !exercise.tempId) || !exercise.sets) return;
+    if (setIndex < 0 || setIndex >= exercise.sets.length) return;
+    
     const newReps = Number(event.detail.value);
     if (isNaN(newReps)) return;
     
     // Update locally first for immediate UI feedback
-    set.reps = newReps;
+    exercise.sets[setIndex].reps = newReps;
     
-    // Update in service (local only)
-    if (set.exerciseSetId) {
-      this.activeWorkoutService.updateSetReps(set.exerciseSetId, newReps);
-    }
+    // Use either real ID or temp ID
+    const exerciseId = exercise.exerciseId || exercise.tempId;
+    
+    if (!exerciseId) return;
+    
+    // Update in service using the index-based method
+    this.activeWorkoutService.updateSetPropertyByIndex(
+      exerciseId,
+      setIndex,
+      'reps',
+      newReps
+    );
   }
 
-  // Toggle set completion
-  toggleSetComplete(set: ExerciseSet) {
-    if (!set || !set.exerciseSetId) return;
+  // Toggle set completion - convert to use indexes
+  toggleSetComplete(exercise: Exercise, setIndex: number) {
+    if (!exercise || (!exercise.exerciseId && !exercise.tempId) || !exercise.sets) return;
+    if (setIndex < 0 || setIndex >= exercise.sets.length) return;
     
     // Toggle the state locally first
+    const set = exercise.sets[setIndex];
     set.completed = !set.completed;
     
-    // Update in service (local only)
-    this.activeWorkoutService.toggleSetCompletion(set.exerciseSetId, set.completed);
+    // Use either real ID or temp ID
+    const exerciseId = exercise.exerciseId || exercise.tempId;
+    
+    if (!exerciseId) return;
+    
+    // Update in service using the index-based method
+    this.activeWorkoutService.updateSetPropertyByIndex(
+      exerciseId,
+      setIndex,
+      'completed',
+      set.completed
+    );
     
     this.changeDetector.markForCheck();
+  }
+
+  // Update the set type change handler
+  onSetTypeChange(exercise: Exercise, setIndex: number): void {
+    if (!exercise || (!exercise.exerciseId && !exercise.tempId) || !exercise.sets) return;
+    if (setIndex < 0 || setIndex >= exercise.sets.length) return;
+    
+    const set = exercise.sets[setIndex];
+    
+    // Use either real ID or temp ID
+    const exerciseId = exercise.exerciseId || exercise.tempId;
+    
+    if (!exerciseId) return;
+    
+    console.log(`Set ${setIndex} type changing to ${set.type}`);
+    
+    // Update in service
+    this.activeWorkoutService.updateSetPropertyByIndex(
+      exerciseId,
+      setIndex,
+      'type',
+      set.type
+    );
+    
+    // Create a completely new copy of all exercises to force full refresh
+    this.exercises = this.exercises.map(ex => {
+      if (ex === exercise) {
+        // For the changed exercise, create a new reference with new sets array
+        return {
+          ...ex,
+          sets: [...ex.sets!]
+        };
+      }
+      return ex;
+    });
+    
+    // Force immediate change detection
+    this.changeDetector.detectChanges();
+    
+    // Log debug info
+    console.log(`Set ${setIndex} type changed to ${set.type}`);
+    console.log('Exercise sets after update:', exercise.sets.map(s => s.type));
+  }
+
+  // Remove set handler
+  async removeSet(exercise: Exercise, setIndex: number) {
+    if (!exercise || (!exercise.exerciseId && !exercise.tempId) || !exercise.sets) return;
+    if (setIndex < 0 || setIndex >= exercise.sets.length) return;
+    
+    // Don't allow removing the last set
+    if (exercise.sets.length <= 1) {
+      this.showToast("Can't remove the last set");
+      return;
+    }
+    
+    // Show confirmation
+    const alert = await this.alertController.create({
+      header: 'Delete Set',
+      message: 'Are you sure you want to delete this set?',
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => {
+            // Use either real ID or temp ID
+            const exerciseId = exercise.exerciseId || exercise.tempId;
+            
+            if (!exerciseId) return;
+            
+            this.activeWorkoutService.removeSetFromExercise(
+              exerciseId,
+              setIndex
+            ).subscribe({
+              next: (updatedExercises) => {
+                this.exercises = updatedExercises;
+                this.changeDetector.markForCheck();
+              },
+              error: (error) => {
+                console.error('Error removing set:', error);
+                this.showToast('Failed to remove set');
+              }
+            });
+          }
+        }
+      ]
+    });
+    
+    await alert.present();
   }
 
   // Exercise library methods
@@ -321,7 +447,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       name: template.name,
       notes: '',
       workoutId: this.workout.workoutId,
-      // Initialize with a single set
       sets: [
         {
           type: SetType.NORMAL,
@@ -411,43 +536,71 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         return;
       }
       
-      // Get data we need before clearing
-      const workout = { ...currentSession.workout };
-      const updatedExercises = [...currentSession.exercises];
-      const timerValue = this.elapsedTime;
+      // Stop the timer to prevent further updates
+      this.stopTimer();
       
-      // Format the duration
+      // Check if we have any temporary exercises that need to be synced
+      const hasTempExercises = currentSession.exercises.some(
+        exercise => !exercise.exerciseId || exercise.exerciseId.toString().startsWith('temp-')
+      );
+      
+      // Format duration for history
+      const timerValue = this.elapsedTime;
       const duration = this.formatDuration(timerValue);
       
       const workoutWithDuration: ActiveWorkout = {
-        ...workout,
+        ...currentSession.workout,
         duration: duration,
         endTime: new Date().toISOString()
       };
       
-      // IMPORTANT: First, stop the timer to prevent further updates
-      this.stopTimer();
-      
-      // Clear the session BEFORE sending to backend
-      await this.activeWorkoutService.clearSavedSession();
-      
-      // Complete the workout - send to backend
-      this.workoutHistoryService.completeWorkout(workoutWithDuration, updatedExercises)
-        .pipe(
-          finalize(() => {
-            loading.dismiss();
-            this.isCompleting = false;
-          })
-        )
-        .subscribe({
-          next: async () => {
-            this.confirmUpdateTemplate(workout, updatedExercises);
-          },
-          error: (error) => {
-            console.error('Error completing workout:', error);
-            this.showToast('Failed to save workout');
-          }
-        });
+      if (hasTempExercises) {
+        // Sync temporary exercises first
+        this.activeWorkoutService.syncWorkoutWithBackend(this.workout.workoutId!)
+          .pipe(
+            // Clear session after syncing
+            switchMap(syncedExercises => {
+              return this.activeWorkoutService.clearSavedSession().then(() => syncedExercises);
+            }),
+            // Complete the workout with synced exercises
+            switchMap(syncedExercises => {
+              return this.workoutHistoryService.completeWorkout(workoutWithDuration, syncedExercises);
+            }),
+            finalize(() => {
+              loading.dismiss();
+              this.isCompleting = false;
+            })
+          )
+          .subscribe({
+            next: async () => {
+              this.confirmUpdateTemplate(currentSession.workout, currentSession.exercises);
+            },
+            error: (error: any) => {
+              console.error('Error completing workout:', error);
+              this.showToast('Failed to save workout');
+            }
+          });
+      } else {
+        // No temp exercises, proceed directly
+        await this.activeWorkoutService.clearSavedSession();
+        
+        this.workoutHistoryService.completeWorkout(workoutWithDuration, currentSession.exercises)
+          .pipe(
+            finalize(() => {
+              loading.dismiss();
+              this.isCompleting = false;
+            })
+          )
+          .subscribe({
+            next: async () => {
+              this.confirmUpdateTemplate(currentSession.workout, currentSession.exercises);
+            },
+            error: (error) => {
+              console.error('Error completing workout:', error);
+              this.showToast('Failed to save workout');
+            }
+          });
+      }
     } catch (error) {
       console.error('Error in finishWorkout:', error);
       this.isCompleting = false;
@@ -462,12 +615,20 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
 
   // Add a set to an exercise
   addSet(exercise: Exercise) {
-    if (!exercise || !exercise.exerciseId) {
+    if (!exercise) {
       this.showToast('Cannot add set: Invalid exercise');
       return;
     }
     
-    this.activeWorkoutService.addSetToExercise(exercise.exerciseId).subscribe({
+    // Use either real ID or temp ID for the exercise
+    const exerciseId = exercise.exerciseId || exercise.tempId;
+    
+    if (!exerciseId) {
+      this.showToast('Cannot add set: Missing exercise information');
+      return;
+    }
+    
+    this.activeWorkoutService.addSetToExercise(exerciseId).subscribe({
       next: (updatedExercises: Exercise[]) => {
         // Update the exercises list
         this.exercises = updatedExercises;
@@ -531,88 +692,81 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   }
 
   async removeExercise(exercise: Exercise) {
-    if (!exercise || !exercise.exerciseId || !this.workout?.workoutId) return;
+    if (!exercise || !this.workout?.workoutId) return;
     
     try {
-      this.activeWorkoutService.removeExerciseFromWorkout(
-        this.workout.workoutId, 
-        exercise.exerciseId
-      ).subscribe({
-        next: (updatedExercises: Exercise[]) => {
-          this.exercises = updatedExercises;
-          this.showToast(`Removed ${exercise.name}`);
-          this.changeDetector.markForCheck();
-        },
-        error: (error) => {
-          console.error('Error removing exercise:', error);
-          this.showToast('Failed to remove exercise');
-        }
-      });
+      // Check if this is a temporary exercise or a real one
+      const isTempExercise = !exercise.exerciseId || exercise.exerciseId.toString().startsWith('temp-');
+      const exerciseId = exercise.exerciseId || exercise.tempId;
+      
+      if (!exerciseId) {
+        this.showToast('Cannot remove exercise: Missing exercise information');
+        return;
+      }
+      
+      // For real exercises (with non-temp IDs), call the backend API first
+      if (!isTempExercise) {
+        console.log(`Deleting real exercise with ID ${exerciseId} from backend`);
+        
+        // Show loading indicator
+        const loading = await this.loadingController.create({
+          message: 'Removing exercise...',
+          duration: 2000
+        });
+        await loading.present();
+        
+        // Call the backend API to delete the exercise
+        this.workoutService.removeExerciseFromWorkout(this.workout.workoutId, exerciseId)
+          .subscribe({
+            next: () => {
+              console.log(`Backend deletion successful for exercise ${exerciseId}`);
+              
+              // Then update the local session
+              this.activeWorkoutService.removeExerciseFromWorkout(
+                this.workout!.workoutId!, 
+                exerciseId
+              ).subscribe({
+                next: (updatedExercises: Exercise[]) => {
+                  this.exercises = updatedExercises;
+                  this.showToast(`Removed ${exercise.name}`);
+                  this.changeDetector.markForCheck();
+                },
+                error: (error) => {
+                  console.error('Error updating local session after exercise removal:', error);
+                  // Even if there's an error updating local session, refresh from backend
+                  this.loadExercises(this.workout!.workoutId!);
+                }
+              });
+            },
+            error: (error) => {
+              console.error(`Error deleting exercise ${exerciseId} from backend:`, error);
+              this.showToast('Failed to remove exercise from server');
+              loading.dismiss();
+            }
+          });
+      } else {
+        // For temporary exercises, just update the local session
+        console.log(`Removing temporary exercise with ID ${exerciseId} from local session`);
+        
+        this.activeWorkoutService.removeExerciseFromWorkout(
+          this.workout.workoutId, 
+          exerciseId
+        ).subscribe({
+          next: (updatedExercises: Exercise[]) => {
+            this.exercises = updatedExercises;
+            this.showToast(`Removed ${exercise.name}`);
+            this.changeDetector.markForCheck();
+          },
+          error: (error) => {
+            console.error('Error removing exercise from local session:', error);
+            this.showToast('Failed to remove exercise');
+          }
+        });
+      }
     } catch (error) {
       console.error('Error in removeExercise:', error);
       this.showToast('An unexpected error occurred');
     }
-  }
-
-  // Set type change handler
-  onSetTypeChange(sets: ExerciseSet[] | undefined, setIndex: number): void {
-    if (!sets || setIndex < 0 || setIndex >= sets.length) return;
-    
-    const set = sets[setIndex];
-    if (!set || !set.exerciseSetId) return;
-    
-    // Update in service (local only)
-    this.activeWorkoutService.updateSetType(set.exerciseSetId, set.type);
-    this.changeDetector.markForCheck();
-  }
-
-  // Remove set handler
-  async removeSet(exercise: Exercise, setIndex: number) {
-    if (!exercise || !exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
-    
-    const set = exercise.sets[setIndex];
-    if (!set) return;
-    
-    // Don't allow removing the last set
-    if (exercise.sets.length <= 1) {
-      this.showToast("Can't remove the last set");
-      return;
-    }
-    
-    // Show confirmation
-    const alert = await this.alertController.create({
-      header: 'Delete Set',
-      message: 'Are you sure you want to delete this set?',
-      buttons: [
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        },
-        {
-          text: 'Delete',
-          role: 'destructive',
-          handler: () => {
-            if (exercise.exerciseId && set.exerciseSetId) {
-              this.activeWorkoutService.removeSetFromExercise(
-                exercise.exerciseId,
-                set.exerciseSetId
-              ).subscribe({
-                next: (updatedExercises) => {
-                  this.exercises = updatedExercises;
-                  this.changeDetector.markForCheck();
-                },
-                error: (error) => {
-                  console.error('Error removing set:', error);
-                  this.showToast('Failed to remove set');
-                }
-              });
-            }
-          }
-        }
-      ]
-    });
-    
-    await alert.present();
   }
 
   // Reorder exercises
@@ -664,13 +818,13 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   }
 
   // Get set display number
-  getNormalSetNumber(sets: ExerciseSet[] | undefined, index: number): string {
+  getNormalSetNumber(sets: ExerciseSet[] | undefined, currentIndex: number): string {
     if (!sets) return '1';
     
-    // Count how many normal sets came before this one
+    // Count how many normal sets came before this one (including this one if it's normal)
     let normalSetCount = 0;
-    for (let i = 0; i <= index; i++) {
-      if (!sets[i].type || sets[i].type === SetType.NORMAL) {
+    for (let i = 0; i <= currentIndex; i++) {
+      if (!sets[i] || !sets[i].type || sets[i].type === SetType.NORMAL) {
         normalSetCount++;
       }
     }
@@ -757,63 +911,75 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
             });
             await loading.present();
             
-            // Create a deep copy to avoid modifying original objects
-            const exercisesToUpdate = JSON.parse(JSON.stringify(exercises));
-            
-            console.log('Preparing exercises for template update:', 
-              exercisesToUpdate.map((e: { name: any; exerciseId: any; sets: any[]; }) => ({
-                name: e.name,
-                exerciseId: e.exerciseId,
-                setCount: e.sets?.length || 0,
-                sets: e.sets?.map(s => ({
-                  orderPosition: s.orderPosition,
-                  reps: s.reps,
-                  weight: s.weight,
-                  type: s.type
-                }))
-              }))
-            );
-            
-            // Make sure all exercises have proper orderPosition based on their sequence
-            const preparedExercises = exercisesToUpdate.map((exercise: { sets: any[]; exerciseId: any; }, exerciseIndex: any) => {
-              // Ensure exercises have 0-based index
-              const cleanedExercise = {
-                ...exercise,
-                orderPosition: exerciseIndex,
-                sets: exercise.sets ? exercise.sets.map((set, setIndex) => {
-                  // Ensure sets have 0-based index and all required properties
-                  return {
-                    ...set,
-                    exerciseId: exercise.exerciseId, // Make sure exerciseId is set
-                    orderPosition: setIndex,
-                    type: set.type || 'NORMAL',
-                    reps: set.reps || 0,
-                    weight: set.weight || 0,
-                    restTimeSeconds: set.restTimeSeconds || 0
-                  };
-                }) : []
-              };
+            try {
+              // Create a deep copy to avoid modifying original objects
+              const exercisesToUpdate = JSON.parse(JSON.stringify(exercises));
               
-              return cleanedExercise;
-            });
-            
-            this.workoutService.updateWorkoutWithExercises(workout, preparedExercises)
-              .pipe(
-                finalize(() => {
-                  loading.dismiss();
-                })
-              )
-              .subscribe({
-                next: () => {
-                  this.showToast('Routine updated successfully');
-                  this.router.navigate(['/tabs/profile']);
-                },
-                error: (error) => {
-                  console.error('Error updating routine:', error);
-                  this.showToast('Failed to update routine');
-                  this.router.navigate(['/tabs/profile']);
-                }
+              // Filter out any exercises without real IDs
+              const validExercises = exercisesToUpdate.filter((exercise: { exerciseId: { toString: () => string; }; }) => 
+                exercise.exerciseId && !exercise.exerciseId.toString().startsWith('temp-')
+              );
+              
+              console.log(`Preparing to update ${validExercises.length} exercises with their sets`);
+              
+              // Make sure all exercises have proper orderPosition based on their sequence
+              const preparedExercises = validExercises.map((exercise: Exercise, exerciseIndex: number) => {
+                // Ensure exercises have 0-based index
+                const cleanedExercise = {
+                  ...exercise,
+                  tempId: undefined, // Remove tempId property
+                  orderPosition: exerciseIndex,
+                  sets: exercise.sets ? exercise.sets.map((set, setIndex) => {
+                    // Keep exerciseSetId if it exists and is not a temp ID
+                    const shouldKeepSetId = set.exerciseSetId && 
+                                           !set.exerciseSetId.toString().startsWith('temp-');
+                    
+                    // Remove properties that shouldn't be sent to backend
+                    const { tempId, completed, ...cleanSet } = set;
+                    
+                    // Ensure sets have 0-based index and all required properties
+                    return {
+                      ...cleanSet,
+                      exerciseSetId: shouldKeepSetId ? cleanSet.exerciseSetId : undefined,
+                      exerciseId: exercise.exerciseId, // Make sure exerciseId is set
+                      orderPosition: setIndex,
+                      type: set.type || 'NORMAL',
+                      reps: set.reps || 0,
+                      weight: set.weight || 0,
+                      restTimeSeconds: set.restTimeSeconds || 0
+                    };
+                  }) : []
+                };
+                
+                return cleanedExercise;
               });
+              
+              console.log('Sending prepared exercises to backend:', preparedExercises);
+              
+              this.workoutService.updateWorkoutWithExercises(workout, preparedExercises)
+                .pipe(
+                  finalize(() => {
+                    loading.dismiss();
+                  })
+                )
+                .subscribe({
+                  next: (response) => {
+                    console.log('Routine update response:', response);
+                    this.showToast('Routine updated successfully');
+                    this.router.navigate(['/tabs/profile']);
+                  },
+                  error: (error) => {
+                    console.error('Error updating routine:', error);
+                    this.showToast('Failed to update routine');
+                    this.router.navigate(['/tabs/profile']);
+                  }
+                });
+            } catch (error) {
+              console.error('Error preparing exercises for update:', error);
+              loading.dismiss();
+              this.showToast('Failed to update routine');
+              this.router.navigate(['/tabs/profile']);
+            }
           }
         }
       ]
@@ -833,19 +999,83 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   }
 
   // Add this method to the ActiveWorkoutPage class
-  onWeightChange(set: ExerciseSet, weight: number): void {
-    if (!set.exerciseSetId) return;
+  onWeightChange(exercise: Exercise, setIndex: number, weight: number): void {
+    if (!exercise || !exercise.exerciseId) return;
     
-    // Update set weight in the service
-    this.activeWorkoutService.updateSetWeight(set.exerciseSetId, weight);
+    // Update set weight in the service using the index-based method
+    this.activeWorkoutService.updateSetPropertyByIndex(
+      exercise.exerciseId,
+      setIndex,
+      'weight',
+      weight
+    );
   }
 
   // Add this method to the ActiveWorkoutPage class
-  onRepsChange(set: ExerciseSet, reps: number): void {
-    if (!set.exerciseSetId) return;
+  onRepsChange(exercise: Exercise, setIndex: number, reps: number): void {
+    if (!exercise || !exercise.exerciseId) return;
     
-    // Update set reps in the service
-    this.activeWorkoutService.updateSetReps(set.exerciseSetId, reps);
+    // Update set reps in the service using the index-based method
+    this.activeWorkoutService.updateSetPropertyByIndex(
+      exercise.exerciseId,
+      setIndex,
+      'reps',
+      reps
+    );
+  }
+
+  // Add/update this method in the active-workout.page.ts file
+  updateSetValue(exercise: Exercise, set: ExerciseSet, property: string, event: any) {
+    if (!exercise) return;
+    
+    const value = event.detail.value;
+    
+    // For temporary sets or exercises, just update locally
+    if (!this.workout?.workoutId || !exercise.exerciseId || !set.exerciseSetId) {
+      this.activeWorkoutService.updateSetProperty(
+        set.exerciseSetId || set.tempId!, 
+        property, 
+        value
+      );
+      
+      // Force UI refresh if changing the set type
+      if (property === 'type') {
+        this.refreshExerciseUI(exercise);
+      }
+      
+      return;
+    }
+
+    // For sets with real IDs, update with backend sync
+    this.activeWorkoutService.updateSetPropertyWithSync(
+      this.workout.workoutId,
+      exercise.exerciseId,
+      set.exerciseSetId,
+      property,
+      value
+    ).subscribe({
+      next: () => {
+        // Force UI refresh if changing the set type
+        if (property === 'type') {
+          this.refreshExerciseUI(exercise);
+        }
+      },
+      error: (error) => {
+        console.error(`Error updating ${property}:`, error);
+        this.showToast(`Failed to update ${property}`);
+      }
+    });
+  }
+
+  // Helper method to force UI refresh
+  private refreshExerciseUI(exercise: Exercise): void {
+    if (!exercise || !exercise.sets) return;
+    
+    // Create a new reference to trigger change detection
+    exercise.sets = [...exercise.sets];
+    
+    // Force immediate update
+    this.changeDetector.detectChanges();
   }
 }
 

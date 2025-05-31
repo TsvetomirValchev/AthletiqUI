@@ -136,7 +136,9 @@
                     'normal-type': set.type === SetType.NORMAL
                   }"
                   interface="popover"
-                  (ionChange)="onSetTypeChange(exercise.sets, setIndex)">
+                  interfaceOptions="{cssClass: 'set-type-popover'}"
+                  (ionChange)="onSetTypeChange(exercise, setIndex)">
+                  <!-- Keep shorter display texts for normal sets -->
                   <ion-select-option [value]="SetType.NORMAL">{{ getNormalSetNumber(exercise.sets, setIndex) }}</ion-select-option>
                   <ion-select-option [value]="SetType.WARMUP">W</ion-select-option>
                   <ion-select-option [value]="SetType.DROPSET">D</ion-select-option>
@@ -149,8 +151,8 @@
                 <ion-item lines="none" class="input-item">
                   <ion-input
                     type="number"
-                    [(ngModel)]="set.weight"
-                    (ionChange)="onWeightChange(set, set.weight || 0)"
+                    [value]="set.weight"
+                    (ionChange)="updateSetValue(exercise, set, 'weight', $event)"
                     inputmode="decimal"
                     min="0"
                     placeholder="0">
@@ -163,8 +165,8 @@
                 <ion-item lines="none" class="input-item">
                   <ion-input
                     type="number"
-                    [(ngModel)]="set.reps"
-                    (ionChange)="onRepsChange(set, set.reps || 0)"
+                    [value]="set.reps"
+                    (ionChange)="updateSetValue(exercise, set, 'reps', $event)"
                     inputmode="numeric"
                     min="0"
                     placeholder="0">
@@ -176,7 +178,7 @@
               <div class="completed-col">
                 <ion-checkbox 
                   [checked]="set.completed" 
-                  (ionChange)="toggleSetComplete(set)"
+                  (ionChange)="toggleSetComplete(exercise, setIndex)"
                   class="set-completion-checkbox">
                 </ion-checkbox>
               </div>
