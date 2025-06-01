@@ -38,8 +38,6 @@ export class ForgotPasswordPage {
       },
       error: (error) => {
         this.isSubmitting = false;
-        // Always show success message even on error for security
-        // (prevents email enumeration attacks)
         this.showSuccessAlert();
         console.error('Error:', error);
       }

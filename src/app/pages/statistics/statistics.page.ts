@@ -26,16 +26,13 @@ import { MuscleGroupChartComponent } from '../../components/muscle-group-chart/m
   ]
 })
 export class StatisticsPage implements OnInit {
-  // Loading state
   isLoading = true;
   error: string | null = null;
 
-  // Calendar data
   currentMonth = new Date();
   workoutDates: Set<string> = new Set();
   selectedDate: string | null = null;
   
-  // Custom calendar variables
   calendarDays: {
     date: Date;
     isCurrentMonth: boolean;
@@ -45,7 +42,6 @@ export class StatisticsPage implements OnInit {
   }[] = [];
   weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   
-  // Stats data
   workoutStats: WorkoutStats = { totalWorkouts: 0, uniqueDays: 0, hoursActive: 0 };
   workoutStreak: WorkoutStreakData = {
     currentStreak: 0,
@@ -55,7 +51,6 @@ export class StatisticsPage implements OnInit {
   };
   daysSinceLastWorkout = 0;
   
-  // API URL
   private apiUrl = environment.apiUrl || 'http://localhost:6969';
 
   constructor(
@@ -71,9 +66,6 @@ export class StatisticsPage implements OnInit {
     this.loadStatistics();
   }
 
-  /**
-   * Main data loading method
-   */
   loadStatistics() {
     this.isLoading = true;
     this.error = null;
@@ -99,9 +91,6 @@ export class StatisticsPage implements OnInit {
     });
   }
 
-  /**
-   * Fetch statistics data with userId
-   */
   private fetchStatisticsData(userId: string) {
     const year = this.currentMonth.getFullYear();
     const month = this.currentMonth.getMonth() + 1;
@@ -150,17 +139,11 @@ export class StatisticsPage implements OnInit {
     });
   }
 
-  /**
-   * Handle when user is not found
-   */
   private handleUserNotFound() {
     this.error = 'User ID not found. Please log in again.';
     this.isLoading = false;
   }
 
-  /**
-   * Process calendar data from API response
-   */
   processCalendarData(calendarData: CalendarDayData[]) {
     this.workoutDates.clear();
     
@@ -175,9 +158,6 @@ export class StatisticsPage implements OnInit {
     });
   }
 
-  /**
-   * Generate custom calendar days for the current month
-   */
   generateCalendarDays() {
     const year = this.currentMonth.getFullYear();
     const month = this.currentMonth.getMonth();
@@ -213,9 +193,6 @@ export class StatisticsPage implements OnInit {
     }
   }
   
-  /**
-   * Format date to YYYY-MM-DD format
-   */
   formatDateToYYYYMMDD(date: Date): string {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -223,9 +200,6 @@ export class StatisticsPage implements OnInit {
     return `${year}-${month}-${day}`;
   }
 
-  /**
-   * Navigate to previous month
-   */
   previousMonth() {
     this.currentMonth = new Date(
       this.currentMonth.getFullYear(),
@@ -235,9 +209,6 @@ export class StatisticsPage implements OnInit {
     this.loadStatistics();
   }
 
-  /**
-   * Navigate to next month
-   */
   nextMonth() {
     this.currentMonth = new Date(
       this.currentMonth.getFullYear(),
@@ -247,9 +218,6 @@ export class StatisticsPage implements OnInit {
     this.loadStatistics();
   }
   
-  /**
-   * Select a date from the calendar
-   */
   selectDate(day: any) {
     if (day.isCurrentMonth) {
       const dateStr = this.formatDateToYYYYMMDD(day.date);
@@ -262,9 +230,6 @@ export class StatisticsPage implements OnInit {
     }
   }
   
-  /**
-   * Generic error handler for HTTP requests
-   */
   private handleError<T>(operation = 'operation', result?: T) {
     return (error: HttpErrorResponse) => {
       return of(result as T);

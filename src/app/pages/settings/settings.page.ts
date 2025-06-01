@@ -26,10 +26,6 @@ export class SettingsPage implements OnInit {
  
   }
 
-  toggleDarkTheme(shouldAdd: boolean) {
-    document.body.classList.toggle('dark', shouldAdd);
-  }
-
   async resetPassword() {
     const alert = await this.alertController.create({
       header: 'Reset Password',
@@ -42,7 +38,6 @@ export class SettingsPage implements OnInit {
         {
           text: 'Send Link',
           handler: () => {
-            // Logic to request password reset
           }
         }
       ]

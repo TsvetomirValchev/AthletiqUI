@@ -14,7 +14,6 @@ import { of, forkJoin, Subscription, BehaviorSubject } from 'rxjs';
 import { ToastController } from '@ionic/angular';
 import { ExerciseImageService } from '../../services/exercise-image.service';
 
-// Interface to extend ExerciseHistory with UI state
 interface ExerciseHistoryWithUIState extends ExerciseHistory {
   showSets?: boolean;
 }
@@ -27,14 +26,12 @@ interface ExerciseHistoryWithUIState extends ExerciseHistory {
   imports: [IonicModule, CommonModule, FormsModule, RouterLink]
 })
 export class ProfilePage implements OnInit, OnDestroy {
-  // User profile data
   username: string = '';
   totalWorkouts: number = 0;
   hoursActive: number = 0;  daysActive: number = 0;
   userId: string | null = null;
-  public showDebug = true; // Set this to false in production
+  public showDebug = true;
   
-  // Workout history
   workoutHistory: WorkoutHistory[] = [];
   expandedWorkoutId: string | null = null;
   expandedWorkoutDetails: WorkoutHistory | null = null;
@@ -42,10 +39,8 @@ export class ProfilePage implements OnInit, OnDestroy {
   loadingDetails: boolean = false;
   expandedWorkoutIndex: number | null = null;
 
-  // Map to track expanded exercise states
   exerciseVisibilityMap: Map<string, boolean> = new Map();
 
-  // Add this property
   private subscriptions: Subscription = new Subscription();
   private refreshTrigger = new BehaviorSubject<boolean>(true);
   
@@ -61,7 +56,6 @@ export class ProfilePage implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadUserProfile();
     
-    // Subscribe to history refresh events
     this.subscriptions.add(
       this.workoutHistoryService.historyRefresh$.subscribe(() => {
         console.log('History refresh event received in profile page');
@@ -74,14 +68,10 @@ export class ProfilePage implements OnInit, OnDestroy {
     this.loadUserProfile();
   }
 
-  // Add ngOnDestroy to clean up subscriptions
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
   }
 
-  /**
-   * Load user profile and workout statistics
-   */
   loadUserProfile() {
     this.authService.currentUser$.pipe(
       switchMap(user => {
@@ -137,9 +127,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Load workout history data with complete details
-   */
   loadWorkoutHistory() {
     this.isLoading = true;
     console.log('Loading workout history...');
@@ -156,11 +143,10 @@ export class ProfilePage implements OnInit, OnDestroy {
             console.warn(`Warning: ${missingIds} workout(s) have missing IDs`);
           }
           
-          // Load details for each workout
           this.loadAllWorkoutDetails(history);
         } else {
           this.workoutHistory = [];
-          this.totalWorkouts = 0; // Set to 0 if no workouts
+          this.totalWorkouts = 0;
           this.isLoading = false;
         }
       },
@@ -172,9 +158,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Load details for all workouts
-   */
   loadAllWorkoutDetails(workouts: WorkoutHistory[]) {
     if (!workouts || workouts.length === 0) {
       this.workoutHistory = [];
@@ -214,9 +197,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Toggle displaying workout details
-   */
   toggleWorkoutDetails(workoutId: string | undefined) {
     console.log('Toggle workout details called with ID:', workoutId);
     
@@ -251,9 +231,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Toggle displaying workout details using array index
-   */
   toggleWorkoutDetailsByIndex(index: number, workoutId?: string) {
     
     const workout = this.workoutHistory[index];
@@ -283,7 +260,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       next: (details) => {        
         console.log('Workout details loaded successfully:', details);
         
-        // Sort sets within each exercise by order position
         this.ensureSortedSets(details);
         
         if (details.exerciseHistories) {
@@ -305,9 +281,9 @@ export class ProfilePage implements OnInit, OnDestroy {
         this.showToast('Error loading workout details');
       }
     });
-  }  /**
-   * Initialize exercise visibility map for a workout
-   */  private initializeExerciseVisibility(workout: WorkoutHistory): void {
+  }
+  
+  private initializeExerciseVisibility(workout: WorkoutHistory): void {
     if (!workout.exerciseHistories) return;
     
     workout.exerciseHistories.forEach(exercise => {
@@ -317,22 +293,18 @@ export class ProfilePage implements OnInit, OnDestroy {
       this.exerciseVisibilityMap.set(key, false);
     });
   }
-    /**
-   * Create a unique key for an exercise to track its visibility state
-   */
+  
   getExerciseKey(exercise: ExerciseHistoryWithUIState): string {
     return `${exercise.exerciseHistoryId || ''}-${exercise.exerciseName}-${exercise.orderPosition}`;
   }
 
-    toggleExerciseSets(exercise: ExerciseHistoryWithUIState): void {
+  toggleExerciseSets(exercise: ExerciseHistoryWithUIState): void {
     const key = this.getExerciseKey(exercise);
     const currentValue = this.exerciseVisibilityMap.get(key) || false;
     
     this.exerciseVisibilityMap.set(key, !currentValue);
     
-    // Force refresh when sets are displayed
     if (!currentValue) {
-      // A small delay to ensure sets are rendered first
       setTimeout(() => {
         this.refreshTrigger.next(true);
         this.changeDetector.detectChanges();
@@ -340,18 +312,12 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   }
   
-  /**
-   * Helper method for the template to get exercise visibility state
-   * This is safe to use in template expressions
-   */
   getExerciseVisibility(exercise: ExerciseHistoryWithUIState): boolean {
     const key = this.getExerciseKey(exercise);
     return this.exerciseVisibilityMap.get(key) || false;
   }
 
-  /**
-   * Calculate total sets from a workout
-   */  calculateTotalSets(workout: WorkoutHistory): number {
+  calculateTotalSets(workout: WorkoutHistory): number {
     if (!workout.exerciseHistories) return 0;
     
     return workout.exerciseHistories.reduce((total, exercise) => {
@@ -359,9 +325,7 @@ export class ProfilePage implements OnInit, OnDestroy {
     }, 0);
   }
 
-  /**
-   * Calculate total volume (weight × reps) for a workout
-   */  calculateTotalVolume(workout: WorkoutHistory): number {
+  calculateTotalVolume(workout: WorkoutHistory): number {
     let volume = 0;
     if (workout.exerciseHistories) {
       for (const exercise of workout.exerciseHistories) {
@@ -377,9 +341,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     return volume;
   }
 
-  /**
-   * Show a toast message
-   */
   async showToast(message: string) {
     const toast = await this.toastController.create({
       message,
@@ -390,9 +351,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     await toast.present();
   }
 
-  /**
-   * Format duration for display
-   */
   formatDuration(isoDuration: string): string {
     const durationSeconds = this.parseDuration(isoDuration);
     
@@ -413,28 +371,21 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Parse an ISO 8601 duration string into seconds
-   */
   parseDuration(isoDuration: string): number {
     if (!isoDuration) return 0;
     
-    // Simple parsing of PT[hours]H[minutes]M[seconds]S format
     let seconds = 0;
     
-    // Hours
     const hoursMatch = isoDuration.match(/(\d+)H/);
     if (hoursMatch) {
       seconds += parseInt(hoursMatch[1]) * 3600;
     }
     
-    // Minutes
     const minutesMatch = isoDuration.match(/(\d+)M/);
     if (minutesMatch) {
       seconds += parseInt(minutesMatch[1]) * 60;
     }
     
-    // Seconds
     const secondsMatch = isoDuration.match(/(\d+)S/);
     if (secondsMatch) {
       seconds += parseInt(secondsMatch[1]);
@@ -443,23 +394,14 @@ export class ProfilePage implements OnInit, OnDestroy {
     return seconds;
   }
 
-  /**
-   * Get image URL for an exercise
-   */
   getExerciseImage(exerciseName: string): string {
     return this.exerciseImageService.getExerciseImageUrl(exerciseName);
   }
 
-  /**
-   * Handle image loading errors
-   */
   handleImageError(event: any): void {
     this.exerciseImageService.handleImageError(event);
   }
 
-  /**
-   * Get the CSS class for a set type
-   */
   getSetTypeClass(type?: string): string {
     if (!type) return 'normal-type';
     
@@ -475,31 +417,24 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Get display label for a set - direct fix that explicitly forces correct numbering
-   */
   getSetDisplay(set: SetHistory, exercise?: ExerciseHistory): string {
-    console.log(`getSetDisplay called for set:`, set); // Debug to verify method is called
+    console.log(`getSetDisplay called for set:`, set);
   
-    // First check for special types - these return letters
     if (set.type && set.type !== 'NORMAL') {
       if (set.type === 'WARMUP') return 'W';
       if (set.type === 'DROPSET') return 'D';
       if (set.type === 'FAILURE') return 'F';
     }
 
-    // For normal sets, we need to track which normal set number this is
     if (!exercise?.exerciseSetHistories) return '1';
     
-    // Get all sets sorted by order position
     const sortedSets = [...exercise.exerciseSetHistories]
       .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0));
     
-    // Find the index of the current set in the sorted array
     const currentSetIndex = sortedSets.findIndex(s => 
-      s === set || // Direct object reference comparison
-      (s.setHistoryId && s.setHistoryId === set.setHistoryId) || // ID comparison if available
-      (s.orderPosition === set.orderPosition && s.weight === set.weight && s.reps === set.reps) // Property comparison
+      s === set || 
+      (s.setHistoryId && s.setHistoryId === set.setHistoryId) || 
+      (s.orderPosition === set.orderPosition && s.weight === set.weight && s.reps === set.reps)
     );
     
     if (currentSetIndex === -1) {
@@ -507,7 +442,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       return '1';
     }
     
-    // Count normal sets up to and including this one
     let normalSetCounter = 0;
     
     for (let i = 0; i <= currentSetIndex; i++) {
@@ -520,9 +454,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     return normalSetCounter.toString();
   }
 
-  /**
-   * Ensure sets are properly sorted by orderPosition
-   */
   private ensureSortedSets(workout: WorkoutHistory): void {
   if (!workout.exerciseHistories) return;
   
@@ -530,12 +461,10 @@ export class ProfilePage implements OnInit, OnDestroy {
   
   workout.exerciseHistories.forEach(exercise => {
     if (exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0) {
-      // Sort the sets
       const sortedSets = [...exercise.exerciseSetHistories].sort(
         (a, b) => (a.orderPosition || 0) - (b.orderPosition || 0)
       );
       
-      // Create a brand new array to trigger change detection
       exercise.exerciseSetHistories = sortedSets;
       changed = true;
       
@@ -546,7 +475,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   });
   
-  // Force change detection
   if (changed) {
       setTimeout(() => {
         console.log('Forcing change detection after sort');

@@ -21,7 +21,7 @@ export class WorkoutPage implements OnInit, OnDestroy {
   
   private exercisesCache = new Map<string, Exercise[]>();
   private subscription: Subscription = new Subscription();
-  private justLoaded = false; // Add this property to WorkoutPage
+  private justLoaded = false;
 
   constructor(
     private workoutService: WorkoutService,
@@ -33,13 +33,12 @@ export class WorkoutPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     console.log('WorkoutPage: Initializing');
-    this.loadWorkouts(); // Initial load
+    this.loadWorkouts();
     
-    // Subscribe to refresh events with clear debug logging
     this.subscription.add(
       this.workoutService.workoutsRefresh$.subscribe(() => {
         console.log('WorkoutPage: Refresh event received, reloading workouts');
-        this.resetCaches(); // Add a method to clear all caches
+        this.resetCaches();
         this.loadWorkouts();
       })
     );
@@ -49,7 +48,6 @@ export class WorkoutPage implements OnInit, OnDestroy {
     this.subscription.unsubscribe();
   }
 
-  // Add this method to reset all caches
   private resetCaches() {
     console.log('WorkoutPage: Resetting all caches');
     this.exercisesCache.clear();
@@ -61,7 +59,6 @@ export class WorkoutPage implements OnInit, OnDestroy {
     this.isLoading = true;
     this.justLoaded = true;
     
-    // Set a timeout to reset the flag after 500ms
     setTimeout(() => this.justLoaded = false, 500);
     
     this.workoutService.getWorkoutsWithExercises().subscribe({
@@ -69,7 +66,6 @@ export class WorkoutPage implements OnInit, OnDestroy {
         console.log('WorkoutPage: Workouts loaded successfully', workoutsWithExercises.length);
         this.workouts = workoutsWithExercises.map(item => item.workout);
         
-        // Reset and rebuild the exercise maps
         this.resetCaches();
         workoutsWithExercises.forEach(item => {
           if (item.workout.workoutId) {
@@ -90,7 +86,7 @@ export class WorkoutPage implements OnInit, OnDestroy {
   getWorkoutExercises(workoutId: string): Exercise[] {
     if (!this.exercisesCache.has(workoutId)) {
       const exercises = this.workoutExercises.get(workoutId) || [];
-      // Sort exercises by orderPosition before caching
+      
       const sortedExercises = [...exercises].sort(
         (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
       );
@@ -201,7 +197,6 @@ export class WorkoutPage implements OnInit, OnDestroy {
     }
   }
   
-  // Add a manual refresh handler
   doRefresh(event: any) {
     console.log('WorkoutPage: Manual refresh triggered');
     this.resetCaches();

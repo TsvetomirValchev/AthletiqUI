@@ -45,7 +45,6 @@ export class LoginPage implements OnInit {
           this.isLoading = false;
           console.error('Login failed:', error);
           
-          // Show different messages based on error type
           let errorMessage = 'Login failed.';
           
           if (error.status === 0) {
@@ -67,12 +66,10 @@ export class LoginPage implements OnInit {
       });
     } else {
       console.log('Form is invalid');
-      // Show validation errors
       this.markFormGroupTouched(this.loginForm);
     }
   }
   
-  // Helper to show validation errors
   markFormGroupTouched(formGroup: FormGroup) {
     Object.values(formGroup.controls).forEach(control => {
       control.markAsTouched();
