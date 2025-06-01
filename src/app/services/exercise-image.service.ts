@@ -19,16 +19,11 @@ export class ExerciseImageService {
   
   private readonly defaultImage = 'assets/logo/athletiq-logo.jpeg';
   
-  /**
-   * Get the image URL for an exercise based on its name
-   */
+
   getExerciseImageUrl(exerciseName: string): string {
     return this.defaultImages[exerciseName] || this.defaultImage;
   }
   
-  /**
-   * Handle image loading errors
-   */
   handleImageError(event: any): void {
     event.target.src = this.defaultImage;
   }

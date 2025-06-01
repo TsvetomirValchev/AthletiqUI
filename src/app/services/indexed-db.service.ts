@@ -40,7 +40,6 @@ export class IndexedDBService {
       request.onupgradeneeded = (event) => {
         const db = request.result;
         
-        // Create active workout store
         if (!db.objectStoreNames.contains('active_workouts')) {
           const store = db.createObjectStore('active_workouts', { keyPath: 'id' });
           store.createIndex('workoutId', 'workoutId', { unique: true });
@@ -50,7 +49,6 @@ export class IndexedDBService {
     });
   }
 
-  // Save active workout session
   saveActiveWorkout(session: any): Observable<boolean> {
     return from(this.initDatabase()).pipe(
       switchMap(() => {
@@ -60,17 +58,14 @@ export class IndexedDBService {
 
         return new Observable<boolean>(observer => {
           try {
-            // Ensure the session has an ID
             if (!session.id) {
               session.id = 'active_session';
             }
             
-            // Add null check for this.db
             if (!this.db) {
               throw new Error('Database is null');
             }
             
-            // Debug log to verify the data being saved
             console.log('Saving to IndexedDB:', JSON.stringify({
               id: session.id,
               workoutId: session.workout?.workoutId,
@@ -81,7 +76,6 @@ export class IndexedDBService {
             const transaction = this.db.transaction(['active_workouts'], 'readwrite');
             const store = transaction.objectStore('active_workouts');
             
-            // Save the session
             const request = store.put(session);
             
             request.onsuccess = () => {
@@ -109,7 +103,6 @@ export class IndexedDBService {
     );
   }
 
-  // Load active workout session
   getActiveWorkout(): Observable<any> {
     return from(this.initDatabase()).pipe(
       switchMap(() => {
@@ -119,7 +112,6 @@ export class IndexedDBService {
 
         return new Observable<any>(observer => {
           try {
-            // Fix #2: Add null check for this.db
             if (!this.db) {
               throw new Error('Database is null');
             }
@@ -127,7 +119,6 @@ export class IndexedDBService {
             const transaction = this.db.transaction(['active_workouts'], 'readonly');
             const store = transaction.objectStore('active_workouts');
             
-            // Get the active session
             const request = store.get('active_session');
             
             request.onsuccess = () => {
@@ -161,7 +152,6 @@ export class IndexedDBService {
     );
   }
 
-  // Clear active workout session
   clearActiveWorkout(): Observable<boolean> {
     return from(this.initDatabase()).pipe(
       switchMap(() => {
@@ -171,7 +161,6 @@ export class IndexedDBService {
 
         return new Observable<boolean>(observer => {
           try {
-            // Fix #3: Add null check for this.db
             if (!this.db) {
               throw new Error('Database is null');
             }
@@ -179,7 +168,6 @@ export class IndexedDBService {
             const transaction = this.db.transaction(['active_workouts'], 'readwrite');
             const store = transaction.objectStore('active_workouts');
             
-            // Delete the active session
             const request = store.delete('active_session');
             
             request.onsuccess = () => {

@@ -12,14 +12,14 @@ import { SetHistory } from '../models/set-history.model';
 
 export interface WorkoutStatistics {
   totalWorkouts: number;
-  totalTimeSpent: number; // in seconds
+  totalTimeSpent: number;
   mostTrainedMuscleGroup: string;
   strongestExercise: {
     name: string;
     maxWeight: number;
   };
   totalVolume: number;
-  averageWorkoutDuration: number; // in seconds
+  averageWorkoutDuration: number;
 }
 
 @Injectable({
@@ -33,11 +33,7 @@ export class WorkoutHistoryService {
 
   constructor(private http: HttpClient, private authService: AuthService) {}
 
-  /**
-   * Save a completed workout to history
-   */
   public saveWorkoutToHistory(completedWorkout: ActiveWorkout, exercises: Exercise[]): Observable<WorkoutHistory> {
-    // Ensure we have user ID
     const userId = completedWorkout.userId || localStorage.getItem('userId');
     if (!userId) {
       console.error('Cannot save workout history: missing userId');
@@ -46,7 +42,6 @@ export class WorkoutHistoryService {
     
     console.log('Creating workout history for user:', userId);
     
-    // Create the payload directly, matching backend DTO structure
     const payload = {
       userId: userId,
       name: completedWorkout.name || 'Workout',
@@ -61,14 +56,13 @@ export class WorkoutHistoryService {
           reps: set.reps || 0,
           weight: set.weight || 0,
           completed: set.completed || false,
-          type: set.type || 'NORMAL' // Add set type
+          type: set.type || 'NORMAL'
         })) || []
       }))
     };
     
     console.log('Saving workout history payload:', JSON.stringify(payload, null, 2));
     
-    // Make a direct HTTP POST call to the backend
     return this.http.post<WorkoutHistory>(`${this.apiUrl}`, payload).pipe(
       tap(response => {
         console.log('Workout history saved successfully. Response:', response);
@@ -82,11 +76,7 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Complete a workout and save it to history
-   */
   public completeWorkout(workout: ActiveWorkout, exercises: Exercise[]): Observable<any> {    
-    // Format current date as YYYY-MM-DD
     const currentDate = new Date().toISOString().split('T')[0];
     
     const cleanedExercises = exercises
@@ -104,7 +94,6 @@ export class WorkoutHistoryService {
           }))
       }));
     
-    // Create payload for the API
     const payload = {
       userId: workout.userId || localStorage.getItem('userId'),
       name: workout.name || 'Workout',
@@ -133,21 +122,13 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Force refresh workout history data
-   */
   public refreshHistory(): void {
     console.log('Forcing refresh of workout history');
-    // Clear any cached data
     this.workoutHistoryCache = null;
     
-    // Emit the event to notify subscribers
     this.historyRefreshSubject.next();
   }
 
-  /**
-   * Get all workout history items for the current user
-   */
   public getWorkoutHistory(): Observable<WorkoutHistory[]> {
     if (this.workoutHistoryCache) {
       console.log('Returning cached workout history');
@@ -198,9 +179,6 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Get detailed workout history by ID including exercises and sets
-   */
   public getWorkoutHistoryDetail(historyId: string): Observable<WorkoutHistory> {
     if (!historyId) {
       console.error('Cannot fetch workout details: missing or invalid ID');
@@ -215,10 +193,6 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Fallback method to construct workout details when direct fetch fails
-   * This fetches the basic workout info and then adds exercises separately
-   */
   private getFallbackWorkoutDetails(historyId: string): Observable<WorkoutHistory> {
     return this.getWorkoutHistory().pipe(
       switchMap(histories => {
@@ -251,9 +225,6 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Get exercise histories for a workout - using dedicated endpoint
-   */
   public getExerciseHistoriesByWorkoutId(workoutHistoryId: string): Observable<ExerciseHistory[]> {
     if (!workoutHistoryId) {
       return throwError(() => new Error('Missing workout history ID'));
@@ -274,9 +245,6 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Get set histories for an exercise
-   */
   public getSetHistoriesByExerciseId(exerciseHistoryId: string): Observable<SetHistory[]> {
     return this.http.get<SetHistory[]>(`${environment.apiUrl}/set-histories/exercise/${exerciseHistoryId}`).pipe(
       catchError(error => {
@@ -286,9 +254,6 @@ export class WorkoutHistoryService {
     );
   }
 
-  /**
-   * Calculate workout duration in seconds
-   */
   public calculateWorkoutDuration(workout: ActiveWorkout): number {
     if (!workout.startTime) {
       return 0;
@@ -302,9 +267,6 @@ export class WorkoutHistoryService {
     return Math.round((endTime - startTime) / 1000);
   }
 
-  /**
-   * Parse ISO-8601 duration string to seconds
-   */
   public parseDuration(duration: string): number {
     if (!duration) return 0;
     
@@ -320,9 +282,6 @@ export class WorkoutHistoryService {
     return hours * 3600 + minutes * 60 + seconds;
   }
 
-  /**
-   * Format duration for display (e.g., "30m" or "1h 30m")
-   */
   public formatDuration(duration: string): string {
     const seconds = this.parseDuration(duration);
     const minutes = Math.floor(seconds / 60);
@@ -336,19 +295,14 @@ export class WorkoutHistoryService {
     }
   }
 
-  /**
-   * Sort workout history by creation timestamp (newest first)
-   */
   private sortWorkoutHistory(history: WorkoutHistory[]): WorkoutHistory[] {
     return [...history].sort((a, b) => {
-      // First try to use createdAt timestamp
       if (a.createdAt && b.createdAt) {
         const dateA = new Date(a.createdAt);
         const dateB = new Date(b.createdAt);
-        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+        return dateB.getTime() - dateA.getTime();
       }
       
-      // Fall back to date field if createdAt is not available
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       return dateB.getTime() - dateA.getTime();

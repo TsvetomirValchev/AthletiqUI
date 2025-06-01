@@ -30,13 +30,11 @@ export class ProfileService {
   ) {
     console.log('Profile service initialized with API URL:', this.apiUrl);
   }
-  /**
-   * Get workout statistics for the current user
-   */  getWorkoutStats(): Observable<WorkoutStats> {
+  
+  
+  getWorkoutStats(): Observable<WorkoutStats> {
     console.log('🔍 Fetching workout stats...');
-    // Get the current user ID from the auth service
     return this.authService.currentUser$.pipe(
-      // Take first emission to prevent hanging on continuous Observable
       switchMap(user => {
         if (!user || !user.userId) {
           console.warn('⚠️ User ID not available for workout stats');
