@@ -3,18 +3,16 @@ import { IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { FormatDurationPipe } from '../../pipes/format-duration.pipe';
-import { ProfileService, UserProfile } from '../../services/profile.service';
+import { ProfileService } from '../../services/profile.service';
 import { WorkoutHistoryService } from '../../services/workout-history.service';
 import { WorkoutHistory } from '../../models/workout-history.model';
 import { ExerciseHistory } from '../../models/exercise-history.model';
 import { SetHistory } from '../../models/set-history.model';
 import { AuthService } from '../../services/auth.service';
-import { finalize, switchMap } from 'rxjs/operators';
-import { of, forkJoin, Observable, Subscription, BehaviorSubject } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+import { of, forkJoin, Subscription, BehaviorSubject } from 'rxjs';
 import { ToastController } from '@ionic/angular';
 import { ExerciseImageService } from '../../services/exercise-image.service';
-import { SetType } from '../../models/set-type.enum';
 
 // Interface to extend ExerciseHistory with UI state
 interface ExerciseHistoryWithUIState extends ExerciseHistory {

@@ -89,22 +89,17 @@ export class WorkoutHistoryService {
     // Format current date as YYYY-MM-DD
     const currentDate = new Date().toISOString().split('T')[0];
     
-    // Clean up exercises and map to the format expected by the backend
-    // Important: Don't filter out temp exercises/sets since they're valid data
-    // Just ensure they have proper format for the backend
     const cleanedExercises = exercises
-      // Don't filter by exerciseId - include all exercises
       .map((exercise) => ({
         exerciseName: exercise.name || 'Exercise',
         orderPosition: exercise.orderPosition, 
         notes: exercise.notes || '',
         exerciseSetHistories: (exercise.sets || [])
-          // Don't filter by exerciseSetId - include all sets 
           .map((set, setIndex) => ({
             orderPosition: setIndex,
             reps: set.reps || 0,
             weight: set.weight || 0,
-            completed: set.completed || false, // Make sure to preserve the completed state
+            completed: set.completed || false,
             type: set.type || 'NORMAL'
           }))
       }));
@@ -120,18 +115,13 @@ export class WorkoutHistoryService {
     
     console.log('Sending workout history payload:', JSON.stringify(payload, null, 2));
     
-    // Update the sequence of operations in the ActiveWorkoutPage's finishWorkout method
-    // First clear the session, then send to backend
     return this.http.post<any>(`${this.apiUrl}`, payload).pipe(
       tap(response => {
-        console.log('Workout completed and saved to history successfully:', response);
         
-        // Store the created history ID for reference
         if (response && response.workoutHistoryId) {
           localStorage.setItem('lastCompletedWorkoutId', response.workoutHistoryId);
         }
         
-        // Force refresh the history data after saving
         this.refreshHistory();
       }),
       catchError(error => {
@@ -142,6 +132,7 @@ export class WorkoutHistoryService {
       })
     );
   }
+
   /**
    * Force refresh workout history data
    */
@@ -158,7 +149,6 @@ export class WorkoutHistoryService {
    * Get all workout history items for the current user
    */
   public getWorkoutHistory(): Observable<WorkoutHistory[]> {
-    // If we have a cached result and no refresh is requested, return it
     if (this.workoutHistoryCache) {
       console.log('Returning cached workout history');
       return of(this.workoutHistoryCache);
@@ -172,7 +162,7 @@ export class WorkoutHistoryService {
         }
                 
         return this.http.get<any[]>(`${this.apiUrl}/user/${user.userId}`).pipe(
-          timeout(8000), // Add timeout to prevent hanging
+          timeout(8000),
           tap(response => {
             console.log('Raw workout history API response:', response);
           }),
@@ -182,18 +172,16 @@ export class WorkoutHistoryService {
               return [];
             }
             
-            // Map each item ensuring ID and createdAt are preserved
             const mappedHistory = history.map(item => {
               if (!item) return null;
               
               return {
                 ...item,
                 workoutHistoryId: item.workoutHistoryId || item.id || null,
-                createdAt: item.createdAt || null, // Ensure createdAt is preserved
+                createdAt: item.createdAt || null,
               };
             }).filter(item => item !== null) as WorkoutHistory[];
 
-            // Cache the result and sort by createdAt timestamp
             this.workoutHistoryCache = this.sortWorkoutHistory(mappedHistory);
             return this.workoutHistoryCache;
           }),
@@ -219,7 +207,6 @@ export class WorkoutHistoryService {
       return throwError(() => new Error('Missing or invalid workout history ID'));
     }
         
-    // Direct HTTP get without transformations
     return this.http.get<WorkoutHistory>(`${this.apiUrl}/${historyId}`).pipe(
       catchError(error => {
         console.error(`Error fetching workout history detail for ID ${historyId}:`, error);
@@ -233,7 +220,6 @@ export class WorkoutHistoryService {
    * This fetches the basic workout info and then adds exercises separately
    */
   private getFallbackWorkoutDetails(historyId: string): Observable<WorkoutHistory> {
-    // First get basic workout info from the history list
     return this.getWorkoutHistory().pipe(
       switchMap(histories => {
         const basicWorkout = histories.find(w => w.workoutHistoryId === historyId);
@@ -244,7 +230,6 @@ export class WorkoutHistoryService {
         
         console.log('Using basic workout info as fallback:', basicWorkout);
         
-        // Then fetch exercise histories separately
         return this.getExerciseHistoriesByWorkoutId(historyId).pipe(
           map(exercises => ({
             ...basicWorkout,
@@ -252,7 +237,6 @@ export class WorkoutHistoryService {
           })),
           catchError(error => {
             console.error('Error fetching exercise histories in fallback:', error);
-            // If even exercise histories fail, return just the basic workout
             return of({
               ...basicWorkout,
               exerciseHistories: []
@@ -277,11 +261,10 @@ export class WorkoutHistoryService {
     
     return this.http.get<any[]>(`${this.apiUrl}/${workoutHistoryId}/exercises`).pipe(
       map(exercises => {
-        // Transform each exercise to map setHistories to exerciseSetHistories
         return exercises.map(exercise => ({
           ...exercise,
           exerciseHistoryId: exercise.exerciseHistoryId || exercise.id,
-          exerciseSetHistories: exercise.setHistories || [] // Map from API field name to model field name
+          exerciseSetHistories: exercise.setHistories || []
         }));
       }),
       catchError(error => {
@@ -354,40 +337,6 @@ export class WorkoutHistoryService {
   }
 
   /**
-   * Calculate performance metrics for exercises
-   */
-  private calculatePerformanceMetrics(exercises: Exercise[]): {
-    totalVolume: number;
-    totalSets: number;
-    totalReps: number;
-    maxWeight: number;
-  } {
-    let totalSets = 0;
-    let totalReps = 0;
-    let maxWeight = 0;
-    let totalVolume = 0;
-    
-    exercises.forEach(exercise => {
-      if (exercise.sets) {
-        totalSets += exercise.sets.length;
-        
-        exercise.sets.forEach(set => {
-          if (set.completed) {
-            const reps = set.reps || 0;
-            const weight = set.weight || 0;
-            
-            totalReps += reps;
-            maxWeight = Math.max(maxWeight, weight);
-            totalVolume += reps * weight;
-          }
-        });
-      }
-    });
-    
-    return { totalVolume, totalSets, totalReps, maxWeight };
-  }
-
-  /**
    * Sort workout history by creation timestamp (newest first)
    */
   private sortWorkoutHistory(history: WorkoutHistory[]): WorkoutHistory[] {
@@ -404,17 +353,5 @@ export class WorkoutHistoryService {
       const dateB = new Date(b.date);
       return dateB.getTime() - dateA.getTime();
     });
-  }
-
-  /**
-   * Calculate total sets from a workout
-   */
-  calculateTotalSets(workout: WorkoutHistory): number {
-    if (!workout.exerciseHistories) return 0;
-    
-    return workout.exerciseHistories.reduce((total, exercise) => {
-      const setCount = exercise.exerciseSetHistories?.length || 0;
-      return total + setCount;
-    }, 0);
   }
 }
