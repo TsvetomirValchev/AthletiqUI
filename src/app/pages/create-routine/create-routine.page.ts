@@ -10,14 +10,15 @@ import { Exercise } from '../../models/exercise.model';
 import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { SetType } from '../../models/set-type.enum';
 import { ExerciseSet } from '../../models/exercise-set.model';
-import { catchError, forkJoin, of } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { SetTypeDisplayPipe } from 'src/app/pipes/set-type-display.pipe';
 
 @Component({
   selector: 'app-create-routine',
   templateUrl: './create-routine.page.html',
   styleUrls: ['./create-routine.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule]
+  imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule, SetTypeDisplayPipe]
 })
 export class CreateRoutinePage implements OnInit {
   routineForm: FormGroup;
@@ -381,17 +382,6 @@ export class CreateRoutinePage implements OnInit {
     }
     return this.tempExerciseSets.get(exerciseId) || [];
   }
-  getNormalSetNumber(sets: ExerciseSet[] | undefined, currentIndex: number): number {
-    if (!sets) return 1;
-    
-    let normalSetCount = 0;
-    for (let i = 0; i <= currentIndex; i++) {
-      if (sets[i].type === SetType.NORMAL) {
-        normalSetCount++;
-      }
-    }
-    return normalSetCount;
-  }
 
   onSetTypeChange(sets: ExerciseSet[] | undefined, setIndex: number): void {
     if (!sets) return;
@@ -697,4 +687,5 @@ updateSetValue(exerciseIndex: number, setIndex: number, property: string, event:
     }
   });
 }
+
 }

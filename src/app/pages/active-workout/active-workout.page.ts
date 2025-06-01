@@ -5,7 +5,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { finalize, switchMap, take } from 'rxjs/operators';
-
 import { ActiveWorkoutService } from '../../services/active-workout.service';
 import { WorkoutService } from '../../services/workout.service';
 import { WorkoutHistoryService } from '../../services/workout-history.service';
@@ -15,13 +14,14 @@ import { ExerciseSet} from '../../models/exercise-set.model';
 import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { Workout } from '../../models/workout.model';
 import { SetType } from '../../models/set-type.enum';
+import { SetTypeDisplayPipe } from 'src/app/pipes/set-type-display.pipe'; 
 
 @Component({
   selector: 'app-active-workout',
   templateUrl: './active-workout.page.html',
   styleUrls: ['./active-workout.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule],
+  imports: [IonicModule, CommonModule, FormsModule, SetTypeDisplayPipe],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ActiveWorkoutPage implements OnInit, OnDestroy {
@@ -736,18 +736,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     };
     
     this.activeWorkoutService.updateSession(updatedSession);
-  }
-
-  getNormalSetNumber(sets: ExerciseSet[] | undefined, currentIndex: number): string {
-    if (!sets) return '1';
-    
-    let normalSetCount = 0;
-    for (let i = 0; i <= currentIndex; i++) {
-      if (!sets[i] || !sets[i].type || sets[i].type === SetType.NORMAL) {
-        normalSetCount++;
-      }
-    }
-    return normalSetCount.toString();
   }
 
   getRestTimeDisplay(seconds: number): string {
