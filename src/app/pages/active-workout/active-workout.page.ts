@@ -14,14 +14,28 @@ import { ExerciseSet} from '../../models/exercise-set.model';
 import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { Workout } from '../../models/workout.model';
 import { SetType } from '../../models/set-type.enum';
-import { SetTypeDisplayPipe } from 'src/app/pipes/set-type-display.pipe'; 
+import { SetTypeDisplayPipe } from '../../pipes/set-type-display.pipe'; 
+import { TimePipe } from '../../pipes/time.pipe';
+import { ExerciseFilterPipe } from '../../pipes/exercise-filter.pipe';
+import { SortPipe } from '../../pipes/sort.pipe';
+import { ExerciseImagePipe } from '../../pipes/exercise-image.pipe';
 
 @Component({
   selector: 'app-active-workout',
   templateUrl: './active-workout.page.html',
   styleUrls: ['./active-workout.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, SetTypeDisplayPipe],
+  imports: [
+    IonicModule, 
+    CommonModule, 
+    FormsModule, 
+    SetTypeDisplayPipe, 
+    TimePipe, 
+    ExerciseFilterPipe,
+    SortPipe,
+    ExerciseImagePipe
+  ],
+  providers: [TimePipe, ExerciseImagePipe],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ActiveWorkoutPage implements OnInit, OnDestroy {
@@ -35,13 +49,12 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   isPaused = false;
   isCompleting = false;
 
+  exerciseOrderChanged = false;
+
   exerciseTemplates: ExerciseTemplate[] = [];
   showExerciseLibrary = false;
-  filteredTemplates: ExerciseTemplate[] = [];
   searchTerm: string = '';
   selectedMuscleGroup: string = 'All Muscles';
-
-  private exerciseOrderChanged = false;
 
   constructor(
     private activeWorkoutService: ActiveWorkoutService,
@@ -53,7 +66,9 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     private toastController: ToastController,
     private changeDetector: ChangeDetectorRef,
     private loadingController: LoadingController,
-    private actionSheetController: ActionSheetController
+    private actionSheetController: ActionSheetController,
+    private timePipe: TimePipe,
+     private exerciseImagePipe: ExerciseImagePipe
   ) {}
 
   ngOnInit() {
@@ -193,28 +208,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     this.activeWorkoutService.resumeWorkout();
     this.startTimer();
     this.changeDetector.markForCheck();
-  }
-  
-  formatTime(seconds: number): string {
-    if (!seconds && seconds !== 0) return '00:00';
-    
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  formatDuration(seconds: number): string {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    let duration = 'PT';
-    if (hours > 0) duration += `${hours}H`;
-    if (minutes > 0) duration += `${minutes}M`;
-    if (secs > 0 || (hours === 0 && minutes === 0)) duration += `${secs}S`;
-    
-    return duration;
   }
 
   isSetCompleted(set: ExerciseSet): boolean {
@@ -378,7 +371,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       this.workoutService.getExerciseTemplates().subscribe({
         next: (templates) => {
           this.exerciseTemplates = templates;
-          this.filteredTemplates = [...templates];
           this.isLoading = false;
           this.changeDetector.markForCheck();
         },
@@ -390,7 +382,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         }
       });
     } else {
-      this.filteredTemplates = [...this.exerciseTemplates];
       this.isLoading = false;
     }
     
@@ -400,11 +391,18 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   addExerciseFromTemplate(template: ExerciseTemplate) {
     if (!template || !template.exerciseTemplateId || !this.workout?.workoutId) return;
     
+    // Ensure proper orderPosition
+    const maxOrderPosition = this.exercises.reduce(
+      (max, exercise) => Math.max(max, exercise.orderPosition || 0), 
+      -1
+    );
+    
     const newExercise: Exercise = {
       exerciseTemplateId: template.exerciseTemplateId,
       name: template.name,
       notes: '',
       workoutId: this.workout.workoutId,
+      orderPosition: maxOrderPosition + 1, // Always put at the end
       sets: [
         {
           type: SetType.NORMAL,
@@ -417,9 +415,15 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       ]
     };
     
+    console.log('Adding exercise with order position:', newExercise.orderPosition);
+    
     this.activeWorkoutService.addExerciseToWorkout(this.workout.workoutId, newExercise).subscribe({
       next: (updatedExercises: Exercise[]) => {
-        this.exercises = updatedExercises;
+        // Double check order positions on returned exercises
+        this.exercises = updatedExercises.map((ex, i) => ({
+          ...ex,
+          orderPosition: ex.orderPosition !== undefined ? ex.orderPosition : i
+        }));
         
         this.showToast(`Added ${template.name}`);
         this.showExerciseLibrary = false;
@@ -432,36 +436,9 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     });
   }
   
-  filterExercises() {
-    if (!this.exerciseTemplates || this.exerciseTemplates.length === 0) {
-      this.filteredTemplates = [];
-      return;
-    }
-    
-    let filtered = [...this.exerciseTemplates];
-    
-    if (this.searchTerm) {
-      const search = this.searchTerm.toLowerCase();
-      filtered = filtered.filter(t => 
-        t.name.toLowerCase().includes(search) || 
-        t.targetMuscleGroups?.some(m => m.toLowerCase().includes(search))
-      );
-    }
-    
-    if (this.selectedMuscleGroup && this.selectedMuscleGroup !== 'All Muscles') {
-      filtered = filtered.filter(t => 
-        t.targetMuscleGroups?.some(muscle => 
-          muscle.toLowerCase() === this.selectedMuscleGroup.toLowerCase())
-      );
-    }
-    
-    this.filteredTemplates = filtered;
-    this.changeDetector.markForCheck();
-  }
-  
   onSearch(event: any) {
     this.searchTerm = event.detail.value;
-    this.filterExercises();
+    this.changeDetector.markForCheck();
   }
   
   closeLibrary() {
@@ -494,7 +471,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       );
       
       const timerValue = this.elapsedTime;
-      const duration = this.formatDuration(timerValue);
+      const duration = this.timePipe.transform(timerValue, 'duration')
       
       const workoutWithDuration: ActiveWorkout = {
         ...currentSession.workout,
@@ -738,20 +715,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     this.activeWorkoutService.updateSession(updatedSession);
   }
 
-  getRestTimeDisplay(seconds: number): string {
-    if (seconds === 0) {
-      return 'Off';
-    } else if (seconds < 60) {
-      return `${seconds}s`;
-    } else {
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return remainingSeconds > 0 
-        ? `${minutes}m ${remainingSeconds}s` 
-        : `${minutes}m`;
-    }
-  }
-
   async discardWorkout() {
     const alert = await this.alertController.create({
       header: 'Discard Workout',
@@ -957,4 +920,11 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     
     this.changeDetector.detectChanges();
   }
+  
+  handleImageError(event: Event): void {
+  const imgElement = event.target as HTMLImageElement;
+  if (imgElement) {
+    imgElement.src = 'assets/logo/athletiq-logo.jpeg';
+  }
+}
 }

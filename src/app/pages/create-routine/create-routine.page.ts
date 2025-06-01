@@ -11,14 +11,29 @@ import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { SetType } from '../../models/set-type.enum';
 import { ExerciseSet } from '../../models/exercise-set.model';
 import { forkJoin, of } from 'rxjs';
-import { SetTypeDisplayPipe } from 'src/app/pipes/set-type-display.pipe';
+import { SetTypeDisplayPipe } from '../../pipes/set-type-display.pipe';
+import { ExerciseFilterPipe } from '../../pipes/exercise-filter.pipe';
+import { SortPipe } from '../../pipes/sort.pipe';
+import { TimePipe } from '../../pipes/time.pipe';
+import { ExerciseImagePipe } from '../../pipes/exercise-image.pipe';
 
 @Component({
   selector: 'app-create-routine',
   templateUrl: './create-routine.page.html',
   styleUrls: ['./create-routine.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule, SetTypeDisplayPipe]
+  imports: [
+    IonicModule, 
+    CommonModule, 
+    FormsModule,
+    ReactiveFormsModule, 
+    SetTypeDisplayPipe,
+    TimePipe,
+    ExerciseFilterPipe,
+    SortPipe,
+    ExerciseImagePipe
+  ],
+  providers: [ExerciseImagePipe]
 })
 export class CreateRoutinePage implements OnInit {
   routineForm: FormGroup;
@@ -29,7 +44,6 @@ export class CreateRoutinePage implements OnInit {
   showLibraryOnMobile = false;
   private tempExerciseSets = new Map<string, ExerciseSet[]>();
   private tempNewExerciseSets = new Map<number, ExerciseSet[]>();
-  filteredTemplates: ExerciseTemplate[] = [];
   muscleFilter = '';
   searchQuery = '';
 
@@ -41,7 +55,8 @@ export class CreateRoutinePage implements OnInit {
     private alertController: AlertController,
     private toastController: ToastController,
     private actionSheetController: ActionSheetController,
-    private changeDetector: ChangeDetectorRef
+    private changeDetector: ChangeDetectorRef,
+    private exerciseImagePipe: ExerciseImagePipe
   ) {
     this.routineForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(3)]]
@@ -143,7 +158,17 @@ export class CreateRoutinePage implements OnInit {
     };
     
     this.exercises.push(newExercise);
+    
+    this.exercises = [...this.exercises];
+    
+    if (window.innerWidth <= 768) {
+      this.showLibraryOnMobile = false;
+    }
+    
     this.showToast(`Added ${template.name}`);
+    
+    this.changeDetector.markForCheck();
+    this.changeDetector.detectChanges();
   }
 
   addSet(exerciseIndex: number) {
@@ -401,6 +426,7 @@ export class CreateRoutinePage implements OnInit {
       }
     }
   }
+
   async showExerciseOptions(exerciseIndex: number) {
     const exercise = this.exercises[exerciseIndex];
     
@@ -469,91 +495,97 @@ export class CreateRoutinePage implements OnInit {
       return;
     }
     
+    const imageSrc = this.exerciseImagePipe.transform(template.name);
+    
     const alert = await this.alertController.create({
       header: template.name,
       message: `
+        <div style="text-align: center; margin-bottom: 16px;">
+          <img src="${imageSrc}" style="max-width: 100px; max-height: 100px;" alt="${template.name}">
+        </div>
         <div>${template.description || 'No description available'}</div>
         <div class="ion-padding-top">
           <strong>Target muscles:</strong> ${template.targetMuscleGroups?.join(', ') || 'Not specified'}
         </div>
       `,
-      buttons: ['Close']
+      buttons: ['Close'],
+      cssClass: 'exercise-detail-alert'
     });
 
     await alert.present();
   }
 
-async removeExercise(index: number) {
-  const exerciseToRemove = this.exercises[index];
-  
-  const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
-  
-  if (workoutId && exerciseToRemove.exerciseId) {
-    try {
-      const loading = await this.toastController.create({
-        message: 'Deleting exercise...',
-        duration: 3000
-      });
-      await loading.present();
-      
-      this.workoutService.removeExerciseFromWorkout(workoutId, exerciseToRemove.exerciseId)
-        .subscribe({
-          next: () => {
-            this.exercises.splice(index, 1);
-            
-            this.exercises.forEach((exercise, idx) => {
-              exercise.orderPosition = idx;
-            });
-            
-            this.showToast('Exercise removed successfully');
-            
-            if (exerciseToRemove.exerciseId) {
-              this.tempExerciseSets.delete(exerciseToRemove.exerciseId);
-            }
-          },
-          error: (error) => {
-            console.error('Error removing exercise:', error);
-            this.showToast('Failed to remove exercise');
-          }
+  async removeExercise(index: number) {
+    const exerciseToRemove = this.exercises[index];
+    
+    const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
+    
+    if (workoutId && exerciseToRemove.exerciseId) {
+      try {
+        const loading = await this.toastController.create({
+          message: 'Deleting exercise...',
+          duration: 3000
         });
-    } catch (error) {
-      console.error('Error in removeExercise:', error);
-      this.showToast('An unexpected error occurred');
-    }
-  } else {
-    this.exercises.splice(index, 1);
-    
-    this.exercises.forEach((exercise, idx) => {
-      exercise.orderPosition = idx;
-    });
-    
-    if (this.tempNewExerciseSets.has(index)) {
-      this.tempNewExerciseSets.delete(index);
-    }
-  }
-
-  this.reindexTempExerciseSets();
-  this.changeDetector.detectChanges();
-}
-
-private reindexTempExerciseSets() {
-  const updatedTempSets = new Map<number, ExerciseSet[]>();
-  
-  this.exercises.forEach((exercise, index) => {
-    if (!exercise.exerciseId) {
-      const entries = Array.from(this.tempNewExerciseSets.entries());
-      for (let i = 0; i < entries.length; i++) {
-        const [oldIndex, sets] = entries[i];
-        if (index < this.exercises.length && this.exercises[oldIndex] === exercise) {
-          updatedTempSets.set(index, sets);
-          break;
-        }
+        await loading.present();
+        
+        this.workoutService.removeExerciseFromWorkout(workoutId, exerciseToRemove.exerciseId)
+          .subscribe({
+            next: () => {
+              this.exercises.splice(index, 1);
+              
+              this.exercises.forEach((exercise, idx) => {
+                exercise.orderPosition = idx;
+              });
+              
+              this.showToast('Exercise removed successfully');
+              
+              if (exerciseToRemove.exerciseId) {
+                this.tempExerciseSets.delete(exerciseToRemove.exerciseId);
+              }
+            },
+            error: (error) => {
+              console.error('Error removing exercise:', error);
+              this.showToast('Failed to remove exercise');
+            }
+          });
+      } catch (error) {
+        console.error('Error in removeExercise:', error);
+        this.showToast('An unexpected error occurred');
+      }
+    } else {
+      this.exercises.splice(index, 1);
+      
+      this.exercises.forEach((exercise, idx) => {
+        exercise.orderPosition = idx;
+      });
+      
+      if (this.tempNewExerciseSets.has(index)) {
+        this.tempNewExerciseSets.delete(index);
       }
     }
-  });
-  
-  this.tempNewExerciseSets = updatedTempSets;
-}
+
+    this.reindexTempExerciseSets();
+    this.changeDetector.detectChanges();
+  }
+
+  private reindexTempExerciseSets() {
+    const updatedTempSets = new Map<number, ExerciseSet[]>();
+    
+    this.exercises.forEach((exercise, index) => {
+      if (!exercise.exerciseId) {
+        const entries = Array.from(this.tempNewExerciseSets.entries());
+        for (let i = 0; i < entries.length; i++) {
+          const [oldIndex, sets] = entries[i];
+          if (index < this.exercises.length && this.exercises[oldIndex] === exercise) {
+            updatedTempSets.set(index, sets);
+            break;
+          }
+        }
+      }
+    });
+    
+    this.tempNewExerciseSets = updatedTempSets;
+  }
 
   async showToast(message: string) {
     const toast = await this.toastController.create({
@@ -563,20 +595,6 @@ private reindexTempExerciseSets() {
       cssClass: 'toast-notification'
     });
     await toast.present();
-  }
-
-  getRestTimeDisplay(seconds: number): string {
-    if (seconds === 0) {
-      return 'Off';
-    } else if (seconds < 60) {
-      return `${seconds}s`;
-    } else {
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return remainingSeconds > 0 
-        ? `${minutes}m ${remainingSeconds}s` 
-        : `${minutes}m`;
-    }
   }
 
   reorderExercises(event: CustomEvent<ItemReorderEventDetail>) {
@@ -590,6 +608,7 @@ private reindexTempExerciseSets() {
     });
     
     this.exercises = [...this.exercises];
+    this.changeDetector.markForCheck();
   }
 
   toggleLibrary(show: boolean): void {
@@ -609,83 +628,76 @@ private reindexTempExerciseSets() {
     this.router.navigate(['/tabs/workouts']);
   }
 
-  applyFilters() {
-  if (!this.exerciseTemplates || this.exerciseTemplates.length === 0) {
-    return;
-  }
-  
-  this.filteredTemplates = this.exerciseTemplates.filter(template => {
-    const matchesMuscle = !this.muscleFilter || 
-      (template.targetMuscleGroups && 
-        template.targetMuscleGroups.some(muscle => 
-          muscle.toLowerCase() === this.muscleFilter.toLowerCase()));
+  updateSetValue(exerciseIndex: number, setIndex: number, property: string, event: any) {
+    if (exerciseIndex < 0 || exerciseIndex >= this.exercises.length) return;
     
-    const matchesSearch = !this.searchQuery || 
-      template.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+    const exercise = this.exercises[exerciseIndex];
+    if (!exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
     
-    return matchesMuscle && matchesSearch;
-  });
-}
-
-updateSetValue(exerciseIndex: number, setIndex: number, property: string, event: any) {
-  if (exerciseIndex < 0 || exerciseIndex >= this.exercises.length) return;
-  
-  const exercise = this.exercises[exerciseIndex];
-  if (!exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
-  
-  const set = exercise.sets[setIndex];
-  const value = Number(event.detail.value);
-  
-  switch(property) {
-    case 'reps':
-      set.reps = value;
-      break;
-    case 'weight':
-      set.weight = value;
-      break;
-    case 'restTimeSeconds':
-      set.restTimeSeconds = value;
-      break;
-    case 'type':
-      set.type = event.detail.value;
-      break;
-    default:
-      console.warn(`Unknown property: ${property}`);
-      return;
-  }
-    const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
-  
-  if (!workoutId || !exercise.exerciseId || !set.exerciseSetId) {
-    console.log(`Skipping backend update for ${property}=${value} (local only)`);
-    return;
-  }
-  
-  const setPayload = {
-    exerciseSetId: set.exerciseSetId,
-    exerciseId: exercise.exerciseId,
-    type: set.type || 'NORMAL',
-    reps: set.reps || 0,
-    weight: set.weight || 0,
-    restTimeSeconds: set.restTimeSeconds || 0,
-    orderPosition: set.orderPosition || 0
-  };
-  
-  console.log(`Updating ${property} for set ${set.exerciseSetId} to ${value}`);
-  
-  this.workoutService.updateExerciseSet(
-    workoutId,
-    exercise.exerciseId,
-    set.exerciseSetId,
-    setPayload
-  ).subscribe({
-    next: () => {
-      console.log(`Successfully updated ${property} for set ${set.exerciseSetId}`);
-    },
-    error: (error) => {
-      console.error(`Error updating ${property} for set:`, error);
-      this.showToast(`Failed to update ${property}`);
+    const set = exercise.sets[setIndex];
+    const value = Number(event.detail.value);
+    
+    switch(property) {
+      case 'reps':
+        set.reps = value;
+        break;
+      case 'weight':
+        set.weight = value;
+        break;
+      case 'restTimeSeconds':
+        set.restTimeSeconds = value;
+        break;
+      case 'type':
+        set.type = event.detail.value;
+        break;
+      default:
+        console.warn(`Unknown property: ${property}`);
+        return;
     }
-  });
-}
+      const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
+    
+    if (!workoutId || !exercise.exerciseId || !set.exerciseSetId) {
+      console.log(`Skipping backend update for ${property}=${value} (local only)`);
+      return;
+    }
+    
+    const setPayload = {
+      exerciseSetId: set.exerciseSetId,
+      exerciseId: exercise.exerciseId,
+      type: set.type || 'NORMAL',
+      reps: set.reps || 0,
+      weight: set.weight || 0,
+      restTimeSeconds: set.restTimeSeconds || 0,
+      orderPosition: set.orderPosition || 0
+    };
+    
+    console.log(`Updating ${property} for set ${set.exerciseSetId} to ${value}`);
+    
+    this.workoutService.updateExerciseSet(
+      workoutId,
+      exercise.exerciseId,
+      set.exerciseSetId,
+      setPayload
+    ).subscribe({
+      next: () => {
+        console.log(`Successfully updated ${property} for set ${set.exerciseSetId}`);
+      },
+      error: (error) => {
+        console.error(`Error updating ${property} for set:`, error);
+        this.showToast(`Failed to update ${property}`);
+      }
+    });
+  }
+
+  trackByExercise(index: number, exercise: Exercise): any {
+    return exercise.exerciseTemplateId || index;
+  }
+
+  handleImageError(event: Event): void {
+  const imgElement = event.target as HTMLImageElement;
+    if (imgElement) {
+      imgElement.src = 'assets/logo/athletiq-logo.jpeg';
+    }
+  }
 
 }

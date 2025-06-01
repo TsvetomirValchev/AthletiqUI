@@ -7,12 +7,11 @@ import { ProfileService } from '../../services/profile.service';
 import { WorkoutHistoryService } from '../../services/workout-history.service';
 import { WorkoutHistory } from '../../models/workout-history.model';
 import { ExerciseHistory } from '../../models/exercise-history.model';
-import { SetHistory } from '../../models/set-history.model';
 import { AuthService } from '../../services/auth.service';
 import { switchMap } from 'rxjs/operators';
 import { of, forkJoin, Subscription, BehaviorSubject } from 'rxjs';
 import { ToastController } from '@ionic/angular';
-import { ExerciseImageService } from '../../services/exercise-image.service';
+import { ExerciseImagePipe, } from '../../pipes/exercise-image.pipe';
 
 interface ExerciseHistoryWithUIState extends ExerciseHistory {
   showSets?: boolean;
@@ -23,7 +22,14 @@ interface ExerciseHistoryWithUIState extends ExerciseHistory {
   templateUrl: './profile.page.html',
   styleUrls: ['./profile.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, RouterLink]
+  imports: [
+    IonicModule,
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ExerciseImagePipe,
+  ],
+  providers: [ExerciseImagePipe]
 })
 export class ProfilePage implements OnInit, OnDestroy {
   username: string = '';
@@ -49,7 +55,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     private workoutHistoryService: WorkoutHistoryService,
     private authService: AuthService,
     private toastController: ToastController,
-    private exerciseImageService: ExerciseImageService,
     private changeDetector: ChangeDetectorRef
   ) {}
 
@@ -351,109 +356,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     await toast.present();
   }
 
-  formatDuration(isoDuration: string): string {
-    const durationSeconds = this.parseDuration(isoDuration);
-    
-    if (durationSeconds < 60) {
-      return `${durationSeconds}s`;
-    } else if (durationSeconds < 3600) {
-      const minutes = Math.floor(durationSeconds / 60);
-      const seconds = durationSeconds % 60;
-      return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-    } else {
-      const hours = Math.floor(durationSeconds / 3600);
-      const minutes = Math.floor((durationSeconds % 3600) / 60);
-      if (minutes > 0) {
-        return `${hours}h ${minutes}m`;
-      } else {
-        return `${hours}h`;
-      }
-    }
-  }
-
-  parseDuration(isoDuration: string): number {
-    if (!isoDuration) return 0;
-    
-    let seconds = 0;
-    
-    const hoursMatch = isoDuration.match(/(\d+)H/);
-    if (hoursMatch) {
-      seconds += parseInt(hoursMatch[1]) * 3600;
-    }
-    
-    const minutesMatch = isoDuration.match(/(\d+)M/);
-    if (minutesMatch) {
-      seconds += parseInt(minutesMatch[1]) * 60;
-    }
-    
-    const secondsMatch = isoDuration.match(/(\d+)S/);
-    if (secondsMatch) {
-      seconds += parseInt(secondsMatch[1]);
-    }
-    
-    return seconds;
-  }
-
-  getExerciseImage(exerciseName: string): string {
-    return this.exerciseImageService.getExerciseImageUrl(exerciseName);
-  }
-
-  handleImageError(event: any): void {
-    this.exerciseImageService.handleImageError(event);
-  }
-
-  getSetTypeClass(type?: string): string {
-    if (!type) return 'normal-type';
-    
-    switch (type) {
-      case 'WARMUP':
-        return 'warmup-type';
-      case 'DROPSET':
-        return 'dropset-type';
-      case 'FAILURE':
-        return 'failure-type';
-      default:
-        return 'normal-type';
-    }
-  }
-
-  getSetDisplay(set: SetHistory, exercise?: ExerciseHistory): string {
-    console.log(`getSetDisplay called for set:`, set);
-  
-    if (set.type && set.type !== 'NORMAL') {
-      if (set.type === 'WARMUP') return 'W';
-      if (set.type === 'DROPSET') return 'D';
-      if (set.type === 'FAILURE') return 'F';
-    }
-
-    if (!exercise?.exerciseSetHistories) return '1';
-    
-    const sortedSets = [...exercise.exerciseSetHistories]
-      .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0));
-    
-    const currentSetIndex = sortedSets.findIndex(s => 
-      s === set || 
-      (s.setHistoryId && s.setHistoryId === set.setHistoryId) || 
-      (s.orderPosition === set.orderPosition && s.weight === set.weight && s.reps === set.reps)
-    );
-    
-    if (currentSetIndex === -1) {
-      console.warn('Could not find set in exercise:', set);
-      return '1';
-    }
-    
-    let normalSetCounter = 0;
-    
-    for (let i = 0; i <= currentSetIndex; i++) {
-      const currentSet = sortedSets[i];
-      if (!currentSet.type || currentSet.type === 'NORMAL') {
-        normalSetCounter++;
-      }
-    }
-    
-    return normalSetCounter.toString();
-  }
-
   private ensureSortedSets(workout: WorkoutHistory): void {
   if (!workout.exerciseHistories) return;
   
@@ -482,4 +384,54 @@ export class ProfilePage implements OnInit, OnDestroy {
       }, 0);
     }
   }
+
+  // Add missing methods
+  formatDuration(duration: string | undefined): string {
+    if (!duration) return '';
+    
+    // Clean up PT format to display minutes and seconds
+    return duration
+      .replace('PT', '')
+      .replace('H', 'h ')
+      .replace('M', 'm ')
+      .replace('S', 's');
+  }
+  
+  handleImageError(event: Event): void {
+    const imgElement = event.target as HTMLImageElement;
+    if (imgElement) {
+      imgElement.src = 'assets/logo/athletiq-logo.jpeg';
+    }
+  }
+  
+  getSetTypeClass(type: string | undefined): string {
+    if (!type) return '';
+    
+    switch(type) {
+      case 'WARMUP': return 'warmup-set';
+      case 'DROPSET': return 'dropset-set';
+      case 'FAILURE': return 'failure-set';
+      default: return '';
+    }
+  }
+  
+  getSetDisplay(set: any, exercise: any): string {
+    if (!set || !set.type) return '1';
+    
+    if (set.type === 'NORMAL') {
+      // Count normal sets
+      const normalSets = (exercise.exerciseSetHistories || [])
+        .filter((s: any) => s.type === 'NORMAL' && s.orderPosition <= set.orderPosition)
+        .length;
+      return normalSets.toString();
+    }
+    
+    switch(set.type) {
+      case 'WARMUP': return 'W';
+      case 'DROPSET': return 'D';
+      case 'FAILURE': return 'F';
+      default: return '1';
+    }
+  }
+  
 }

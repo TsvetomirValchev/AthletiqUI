@@ -11,7 +11,7 @@
         </div>
 
         <ion-reorder-group (ionItemReorder)="reorderExercises($event)" disabled="false">
-          <div *ngFor="let exercise of exercises; let exerciseIndex = index" class="exercise-card">
+          <div *ngFor="let exercise of (exercises | sort:'orderPosition'); let exerciseIndex = index; trackBy: trackByExercise" class="exercise-card">
             <div class="exercise-header">
               <div class="exercise-handle">
                 <ion-reorder>
@@ -19,7 +19,9 @@
                 </ion-reorder>
               </div>
               <div class="exercise-avatar">
-                <img [src]="'assets/exercise-icons/barbell.png'" alt="Exercise">
+                <img [src]="exercise.name | exerciseImage" 
+                     alt="{{exercise.name}}"
+                     (error)="handleImageError($event)">
               </div>
               <div class="exercise-title">{{ exercise.name }}</div>
               <div class="exercise-options">
@@ -41,7 +43,7 @@
                 [(ngModel)]="exercise.restTimeSeconds" 
                 [ngModelOptions]="{standalone: true}" 
                 interface="popover" 
-                [selectedText]="getRestTimeDisplay(exercise.restTimeSeconds || 0)">
+                [selectedText]="(exercise.restTimeSeconds || 0) | time:'rest'">
                 <ion-select-option value="0">Off</ion-select-option>
                 <ion-select-option value="15">15s</ion-select-option>
                 <ion-select-option value="30">30s</ion-select-option>
@@ -176,7 +178,7 @@
       </div>
 
       <div class="library-filters">
-        <select class="filter-select" [(ngModel)]="muscleFilter" (change)="applyFilters()">
+        <select class="filter-select" [(ngModel)]="muscleFilter">
           <option value="">All Muscles</option>
           <option value="chest">Chest</option>
           <option value="back">Back</option>
@@ -191,16 +193,20 @@
 
       <div class="search-bar">
         <ion-icon name="search-outline"></ion-icon>
-        <input type="text" placeholder="Search Exercises" class="search-input">
+        <input type="text" placeholder="Search Exercises" class="search-input" [(ngModel)]="searchQuery">
       </div>
 
       <div class="exercise-list-container">
         <div class="exercises-section">
           <div class="section-title">Exercises</div>
           
-          <div *ngFor="let template of exerciseTemplates" class="exercise-item" (click)="addExerciseFromTemplate(template)">
+          <div *ngFor="let template of (exerciseTemplates | exerciseFilter:searchQuery:muscleFilter)" 
+               class="exercise-item" 
+               (click)="addExerciseFromTemplate(template)">
             <div class="exercise-item-avatar">
-              <img src="assets/exercise-icons/barbell.png" alt="Exercise">
+              <img [src]="template.name | exerciseImage" 
+                   alt="{{template.name}}"
+                   (error)="handleImageError($event)">
             </div>
             <div class="exercise-item-details">
               <div class="exercise-item-name">{{ template.name }}</div>

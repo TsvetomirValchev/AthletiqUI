@@ -31,10 +31,8 @@
 
   <div class="workout-history-container">
     <h2>Workout History</h2>
-    
-    <!-- Workout History Cards -->
-    <div *ngIf="!isLoading && workoutHistory && workoutHistory.length > 0" class="workout-history-list">
-      <ion-card *ngFor="let workout of workoutHistory; let i = index" class="workout-card">        <!-- Clickable Header - Toggles Exercise Details -->
+      <div *ngIf="!isLoading && workoutHistory && workoutHistory.length > 0" class="workout-history-list">
+      <ion-card *ngFor="let workout of workoutHistory; let i = index" class="workout-card">
         <ion-card-header (click)="toggleWorkoutDetailsByIndex(i, workout.workoutHistoryId)" [ngClass]="{'expanded': expandedWorkoutIndex === i}">
           <div class="workout-header-content">
             <div class="workout-header-info">
@@ -50,9 +48,7 @@
           </div>
         </ion-card-header>
         
-        <!-- Workout Statistics Summary - Always Visible -->
         <ion-card-content>
-          <!-- Workout stats summary -->
           <div class="stats-summary">
             <div class="stat-item">
               <div class="stat-value">{{ workout.exerciseHistories?.length || 0 }}</div>
@@ -76,16 +72,14 @@
               <p>Loading details...</p>
             </div>
             
-            <!-- No exercises message -->
             <div *ngIf="!loadingDetails && (!workout.exerciseHistories || workout.exerciseHistories.length === 0)" class="no-exercises">
               <p>No exercises found for this workout</p>
             </div>
-            
-            <!-- Exercise items with collapsible sets -->
-            <div *ngFor="let exercise of workout.exerciseHistories; let e = index" class="exercise-item">              <!-- Exercise header - clickable to toggle set visibility -->              <div class="exercise-header" (click)="toggleExerciseSets(exercise)">
+              <div *ngFor="let exercise of workout.exerciseHistories; let e = index" class="exercise-item">
+               <div class="exercise-header" (click)="toggleExerciseSets(exercise)">
                 <div class="exercise-title-container">
                   <div class="exercise-avatar">
-                    <img [src]="getExerciseImage(exercise.exerciseName)" 
+                    <img [src]="exercise.exerciseName | exerciseImage" 
                          alt="{{ exercise.exerciseName }}" 
                          (error)="handleImageError($event)">
                   </div>
@@ -116,21 +110,20 @@
                               [color]="set.completed ? 'success' : 'medium'"></ion-icon>
                   </div>
                 </div>
-              </div>
-                <!-- Show message if no sets -->              <div *ngIf="exerciseVisibilityMap.get(getExerciseKey(exercise)) && (!exercise.exerciseSetHistories || exercise.exerciseSetHistories.length === 0)" class="no-sets">
-                <p>No sets found for this exercise</p>
+                  </div>
+                    <div *ngIf="exerciseVisibilityMap.get(getExerciseKey(exercise)) && (!exercise.exerciseSetHistories || exercise.exerciseSetHistories.length === 0)" class="no-sets">
+                    <p>No sets found for this exercise</p>
+                </div>
               </div>
             </div>
-          </div>
-        </ion-card-content>
-      </ion-card>
-    </div>
+          </ion-card-content>
+        </ion-card>
+      </div>
 
-    <!-- Loading indicator -->
     <div *ngIf="isLoading" class="loading-container">
       <ion-spinner name="crescent"></ion-spinner>
       <p>Loading workout history...</p>
-    </div>    <!-- No workouts message -->
+    </div>
     <div *ngIf="!isLoading && (!workoutHistory || workoutHistory.length === 0)" class="no-workouts">
       <ion-icon name="fitness-outline" size="large"></ion-icon>
       <h3>No Workout History</h3>
