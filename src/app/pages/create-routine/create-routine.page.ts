@@ -10,25 +10,40 @@ import { Exercise } from '../../models/exercise.model';
 import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { SetType } from '../../models/set-type.enum';
 import { ExerciseSet } from '../../models/exercise-set.model';
-import { catchError, forkJoin, of } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { SetTypeDisplayPipe } from '../../pipes/set-type-display.pipe';
+import { ExerciseFilterPipe } from '../../pipes/exercise-filter.pipe';
+import { SortPipe } from '../../pipes/sort.pipe';
+import { TimePipe } from '../../pipes/time.pipe';
+import { ExerciseImagePipe } from '../../pipes/exercise-image.pipe';
 
 @Component({
   selector: 'app-create-routine',
   templateUrl: './create-routine.page.html',
   styleUrls: ['./create-routine.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, ReactiveFormsModule]
+  imports: [
+    IonicModule, 
+    CommonModule, 
+    FormsModule,
+    ReactiveFormsModule, 
+    SetTypeDisplayPipe,
+    TimePipe,
+    ExerciseFilterPipe,
+    SortPipe,
+    ExerciseImagePipe
+  ],
+  providers: [ExerciseImagePipe]
 })
 export class CreateRoutinePage implements OnInit {
   routineForm: FormGroup;
   exerciseTemplates: ExerciseTemplate[] = [];
-  exercises: Exercise[] = []; // Replace exerciseConfigs with exercises
-  SetType = SetType; // Make enum available to template
+  exercises: Exercise[] = [];
+  SetType = SetType;
   isLoading = false;
   showLibraryOnMobile = false;
   private tempExerciseSets = new Map<string, ExerciseSet[]>();
   private tempNewExerciseSets = new Map<number, ExerciseSet[]>();
-  filteredTemplates: ExerciseTemplate[] = [];
   muscleFilter = '';
   searchQuery = '';
 
@@ -40,17 +55,16 @@ export class CreateRoutinePage implements OnInit {
     private alertController: AlertController,
     private toastController: ToastController,
     private actionSheetController: ActionSheetController,
-    private changeDetector: ChangeDetectorRef
+    private changeDetector: ChangeDetectorRef,
+    private exerciseImagePipe: ExerciseImagePipe
   ) {
     this.routineForm = this.fb.group({
       name: ['', [Validators.required, Validators.minLength(3)]]
     });
   }
-
   ngOnInit() {
     this.loadExerciseTemplates();
     
-    // Check if we're editing an existing workout
     const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
     if (workoutId) {
       this.isLoading = true;
@@ -97,12 +111,10 @@ export class CreateRoutinePage implements OnInit {
                 t => t.exerciseTemplateId === templateId
               );
               if (selectedTemplate) {
-                // Create Exercise object directly instead of ExerciseConfig
                 const newExercise: Exercise = {
                   exerciseTemplateId: selectedTemplate.exerciseTemplateId!,
                   name: selectedTemplate.name,
                   notes: '',
-                  // Initialize with a single set
                   sets: [
                     {
                       type: SetType.NORMAL,
@@ -125,18 +137,14 @@ export class CreateRoutinePage implements OnInit {
 
     await alert.present();
   }
-
   addExerciseFromTemplate(template: ExerciseTemplate) {
     if (!template || !template.exerciseTemplateId) return;
     
-    // Create Exercise object with orderPosition based on current array length
     const newExercise: Exercise = {
       exerciseTemplateId: template.exerciseTemplateId,
       name: template.name,
       notes: '',
-      // Set the orderPosition to be the last position
       orderPosition: this.exercises.length,
-      // Initialize with a single set
       sets: [
         {
           type: SetType.NORMAL,
@@ -150,19 +158,27 @@ export class CreateRoutinePage implements OnInit {
     };
     
     this.exercises.push(newExercise);
+    
+    this.exercises = [...this.exercises];
+    
+    if (window.innerWidth <= 768) {
+      this.showLibraryOnMobile = false;
+    }
+    
     this.showToast(`Added ${template.name}`);
+    
+    this.changeDetector.markForCheck();
+    this.changeDetector.detectChanges();
   }
 
   addSet(exerciseIndex: number) {
     if (exerciseIndex >= 0 && exerciseIndex < this.exercises.length) {
       const exercise = this.exercises[exerciseIndex];
       
-      // Ensure exercise.sets is initialized if it doesn't exist
       if (!exercise.sets) {
         exercise.sets = [];
       }
       
-      // Create new set
       const newSet: ExerciseSet = {
         type: SetType.NORMAL,
         orderPosition: exercise.sets.length,
@@ -172,15 +188,11 @@ export class CreateRoutinePage implements OnInit {
         completed: false
       };
       
-      // Get the current workout ID from the route
       const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
-      
-      // For existing exercises with IDs and existing workouts
-      if (exercise.exerciseId && workoutId) {
+        if (exercise.exerciseId && workoutId) {
         this.workoutService.addSetToExercise(workoutId, exercise.exerciseId, newSet)
           .subscribe({
             next: () => {
-              // Success - add to local UI array too to avoid reloading
               if (!exercise.sets) {
                 exercise.sets = [];
               }
@@ -193,34 +205,27 @@ export class CreateRoutinePage implements OnInit {
             }
           });
       } else {
-          // Add set to the UI array
-        if (!exercise.sets) {
-          exercise.sets = [];
-        }
-        // Safely push to exercise sets
-        exercise.sets?.push(newSet) || (exercise.sets = [newSet]);
-        
-        // Also store in temporary storage for later saving
-        if (exercise.exerciseId) {
-          // For existing exercises with IDs
-          if (!this.tempExerciseSets.has(exercise.exerciseId)) {
-            this.tempExerciseSets.set(exercise.exerciseId, [newSet]);
-          } else {
-            const currentSets = this.tempExerciseSets.get(exercise.exerciseId) || [];
-            this.tempExerciseSets.set(exercise.exerciseId, [...currentSets, newSet]);
+          if (!exercise.sets) {
+            exercise.sets = [];
           }
-        } else {
-          // For new exercises without IDs
-          const index = this.exercises.indexOf(exercise);
-          if (!this.tempNewExerciseSets.has(index)) {
-            this.tempNewExerciseSets.set(index, [newSet]);
+          exercise.sets?.push(newSet) || (exercise.sets = [newSet]);          
+          if (exercise.exerciseId) {
+            if (!this.tempExerciseSets.has(exercise.exerciseId)) {
+              this.tempExerciseSets.set(exercise.exerciseId, [newSet]);
+            } else {
+              const currentSets = this.tempExerciseSets.get(exercise.exerciseId) || [];
+              this.tempExerciseSets.set(exercise.exerciseId, [...currentSets, newSet]);
+            }
           } else {
-            const currentSets = this.tempNewExerciseSets.get(index) || [];
-            this.tempNewExerciseSets.set(index, [...currentSets, newSet]);
-          }
+            const index = this.exercises.indexOf(exercise);
+            if (!this.tempNewExerciseSets.has(index)) {
+              this.tempNewExerciseSets.set(index, [newSet]);
+            } else {
+              const currentSets = this.tempNewExerciseSets.get(index) || [];
+              this.tempNewExerciseSets.set(index, [...currentSets, newSet]);
+            }
         }
-        
-        // Ensure change detection runs
+      
         this.changeDetector.markForCheck();
         this.changeDetector.detectChanges();
       }
@@ -244,7 +249,6 @@ export class CreateRoutinePage implements OnInit {
       if (exercise.sets && setIndex >= 0 && setIndex < exercise.sets.length) {
         exercise.sets.splice(setIndex, 1);
         
-        // Update order positions after removal
         exercise.sets.forEach((set: ExerciseSet, idx: number) => {
           set.orderPosition = idx;
         });
@@ -263,7 +267,6 @@ export class CreateRoutinePage implements OnInit {
       set[property] = minValue;
     }
   }
-
   saveWorkout() {
     console.log('Save button clicked.');
     if (this.routineForm.valid) {
@@ -282,30 +285,23 @@ export class CreateRoutinePage implements OnInit {
         workoutId: workoutId || undefined
       };
       
-      // Debug: Log all exercises with their template IDs before processing
       console.log('Raw exercises before mapping:', this.exercises.map(e => ({
         name: e.name,
         templateId: e.exerciseTemplateId
       })));
       
-      // Make sure all exercises have their sets and orderPosition properly attached
       const exercisesToSave: Exercise[] = this.exercises.map((exercise, index) => {
-        // Create a complete copy with all properties
         const exerciseCopy: Exercise = {
           ...exercise,
           orderPosition: index,
-          // Force the template ID to be included
           exerciseTemplateId: exercise.exerciseTemplateId
         };
-        
-        // Handle sets
-        let sets = [...(exercise.sets || [])];
+          let sets = [...(exercise.sets || [])];
         sets = sets.map((set, setIndex) => ({
           ...set,
           orderPosition: setIndex
         }));
         
-        // Reassign sets to the copy
         exerciseCopy.sets = sets;
         
         console.log(`Preparing exercise ${exerciseCopy.name}:`, {
@@ -316,19 +312,16 @@ export class CreateRoutinePage implements OnInit {
         return exerciseCopy;
       });
       
-      // Debug: Verify template IDs are present in final payload
       console.log('Final exercises to save:', exercisesToSave.map(e => ({
         name: e.name,
         templateId: e.exerciseTemplateId,
         setCount: e.sets?.length || 0
       })));
       
-      // Choose whether to create new or update existing
       const saveOperation = workoutId
         ? this.workoutService.updateWorkoutWithExercises(workoutData, exercisesToSave)
         : this.workoutService.createWorkoutWithExercises(workoutData, exercisesToSave);
       
-      // Process the operation
       saveOperation.subscribe({
         next: () => {
           this.isLoading = false;
@@ -339,7 +332,6 @@ export class CreateRoutinePage implements OnInit {
             : 'Workout created successfully';
           this.showToast(message);
           
-          // Navigate after showing toast
           setTimeout(() => {
             window.location.href = '/tabs/workouts';
           }, 500);
@@ -350,8 +342,8 @@ export class CreateRoutinePage implements OnInit {
           this.showToast(`Error ${workoutId ? 'updating' : 'creating'} workout`);
         }
       });
-    } else {
-      // Form is invalid
+    } 
+    else {
       this.showToast('Please enter a valid workout name');
       
       Object.keys(this.routineForm.controls).forEach(key => {
@@ -372,7 +364,6 @@ export class CreateRoutinePage implements OnInit {
         
         this.workoutService.getExercisesForWorkout(workoutId).subscribe({
           next: (exercises) => {
-            // Load sets for each exercise
             const exerciseLoads = exercises.map(exercise => {
               if (exercise.exerciseId) {
                 return this.workoutService.loadExerciseWithSets(workoutId, exercise.exerciseId);
@@ -382,7 +373,6 @@ export class CreateRoutinePage implements OnInit {
             
             forkJoin(exerciseLoads).subscribe({
               next: (exercisesWithSets) => {
-                // Sort exercises by orderPosition before assigning to this.exercises
                 this.exercises = exercisesWithSets.sort((a, b) => 
                   (a.orderPosition || 0) - (b.orderPosition || 0)
                 );
@@ -418,36 +408,19 @@ export class CreateRoutinePage implements OnInit {
     return this.tempExerciseSets.get(exerciseId) || [];
   }
 
-  getNormalSetNumber(sets: ExerciseSet[] | undefined, currentIndex: number): number {
-    if (!sets) return 1;
-    
-    // Count how many normal sets occur before this one
-    let normalSetCount = 0;
-    for (let i = 0; i <= currentIndex; i++) {
-      if (sets[i].type === SetType.NORMAL) {
-        normalSetCount++;
-      }
-    }
-    return normalSetCount;
-  }
-
   onSetTypeChange(sets: ExerciseSet[] | undefined, setIndex: number): void {
     if (!sets) return;
     
-    // Find which exercise contains this set
     for (let exerciseIndex = 0; exerciseIndex < this.exercises.length; exerciseIndex++) {
       const exercise = this.exercises[exerciseIndex];
       if (exercise.sets === sets) {
-        // Create a completely new copy of the exercise
         this.exercises[exerciseIndex] = {
           ...exercise,
           sets: [...(exercise.sets || [])]
         };
         
-        // Force a complete refresh of the exercises array
         this.exercises = [...this.exercises];
         
-        // Run change detection immediately 
         this.changeDetector.detectChanges();
         break;
       }
@@ -475,7 +448,6 @@ export class CreateRoutinePage implements OnInit {
         role: 'destructive',
         icon: 'trash',
         handler: () => {
-          // Show a confirmation alert before deleting
           this.confirmDeleteExercise(exerciseIndex);
         }
       },
@@ -492,8 +464,6 @@ export class CreateRoutinePage implements OnInit {
     });
     await actionSheet.present();
   }
-
-  // Add this helper method
   async confirmDeleteExercise(exerciseIndex: number) {
     const exercise = this.exercises[exerciseIndex];
     const alert = await this.alertController.create({
@@ -525,149 +495,120 @@ export class CreateRoutinePage implements OnInit {
       return;
     }
     
+    const imageSrc = this.exerciseImagePipe.transform(template.name);
+    
     const alert = await this.alertController.create({
       header: template.name,
       message: `
+        <div style="text-align: center; margin-bottom: 16px;">
+          <img src="${imageSrc}" style="max-width: 100px; max-height: 100px;" alt="${template.name}">
+        </div>
         <div>${template.description || 'No description available'}</div>
         <div class="ion-padding-top">
           <strong>Target muscles:</strong> ${template.targetMuscleGroups?.join(', ') || 'Not specified'}
         </div>
       `,
-      buttons: ['Close']
+      buttons: ['Close'],
+      cssClass: 'exercise-detail-alert'
     });
 
     await alert.present();
   }
 
-async removeExercise(index: number) {
-  // Get the exercise to remove
-  const exerciseToRemove = this.exercises[index];
-  
-  // Get current workout ID
-  const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
-  
-  // If we have both a workout ID and the exercise has an ID, it's an existing exercise
-  if (workoutId && exerciseToRemove.exerciseId) {
-    try {
-      // Show loading
-      const loading = await this.toastController.create({
-        message: 'Deleting exercise...',
-        duration: 3000
-      });
-      await loading.present();
-      
-      // Call the API to delete the exercise
-      this.workoutService.removeExerciseFromWorkout(workoutId, exerciseToRemove.exerciseId)
-        .subscribe({
-          next: () => {
-            // Remove from local array
-            this.exercises.splice(index, 1);
-            
-            // Update orderPosition for remaining exercises
-            this.exercises.forEach((exercise, idx) => {
-              exercise.orderPosition = idx;
-            });
-            
-            this.showToast('Exercise removed successfully');
-            
-            // Clear any temporary sets for this exercise
-            if (exerciseToRemove.exerciseId) {
-              this.tempExerciseSets.delete(exerciseToRemove.exerciseId);
-            }
-          },
-          error: (error) => {
-            console.error('Error removing exercise:', error);
-            this.showToast('Failed to remove exercise');
-          }
+  async removeExercise(index: number) {
+    const exerciseToRemove = this.exercises[index];
+    
+    const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
+    
+    if (workoutId && exerciseToRemove.exerciseId) {
+      try {
+        const loading = await this.toastController.create({
+          message: 'Deleting exercise...',
+          duration: 3000
         });
-    } catch (error) {
-      console.error('Error in removeExercise:', error);
-      this.showToast('An unexpected error occurred');
-    }
-  } else {
-    // For new exercises that aren't saved to the backend yet
-    this.exercises.splice(index, 1);
-    
-    this.exercises.forEach((exercise, idx) => {
-      exercise.orderPosition = idx;
-    });
-    
-    // Clear any temporary sets for this exercise
-    if (this.tempNewExerciseSets.has(index)) {
-      this.tempNewExerciseSets.delete(index);
-    }
-  }
-
-  this.reindexTempExerciseSets();
-  // Force change detection to update UI
-  this.changeDetector.detectChanges();
-}
-
-// Add this helper method to reindex temporary exercise sets after deletion
-private reindexTempExerciseSets() {
-  // Create a new map to store the reindexed sets
-  const updatedTempSets = new Map<number, ExerciseSet[]>();
-  
-  // Map each exercise to its current index
-  this.exercises.forEach((exercise, index) => {
-    if (!exercise.exerciseId) {
-      // Use Array.from to convert entries to an array we can iterate
-      const entries = Array.from(this.tempNewExerciseSets.entries());
-      for (let i = 0; i < entries.length; i++) {
-        const [oldIndex, sets] = entries[i];
-        // Check if this is the same exercise at the new index
-        if (index < this.exercises.length && this.exercises[oldIndex] === exercise) {
-          // This is the same exercise, update its index
-          updatedTempSets.set(index, sets);
-          break;
-        }
+        await loading.present();
+        
+        this.workoutService.removeExerciseFromWorkout(workoutId, exerciseToRemove.exerciseId)
+          .subscribe({
+            next: () => {
+              this.exercises.splice(index, 1);
+              
+              this.exercises.forEach((exercise, idx) => {
+                exercise.orderPosition = idx;
+              });
+              
+              this.showToast('Exercise removed successfully');
+              
+              if (exerciseToRemove.exerciseId) {
+                this.tempExerciseSets.delete(exerciseToRemove.exerciseId);
+              }
+            },
+            error: (error) => {
+              console.error('Error removing exercise:', error);
+              this.showToast('Failed to remove exercise');
+            }
+          });
+      } catch (error) {
+        console.error('Error in removeExercise:', error);
+        this.showToast('An unexpected error occurred');
+      }
+    } else {
+      this.exercises.splice(index, 1);
+      
+      this.exercises.forEach((exercise, idx) => {
+        exercise.orderPosition = idx;
+      });
+      
+      if (this.tempNewExerciseSets.has(index)) {
+        this.tempNewExerciseSets.delete(index);
       }
     }
-  });
-  
-  // Replace the old map with the reindexed one
-  this.tempNewExerciseSets = updatedTempSets;
-}
+
+    this.reindexTempExerciseSets();
+    this.changeDetector.detectChanges();
+  }
+
+  private reindexTempExerciseSets() {
+    const updatedTempSets = new Map<number, ExerciseSet[]>();
+    
+    this.exercises.forEach((exercise, index) => {
+      if (!exercise.exerciseId) {
+        const entries = Array.from(this.tempNewExerciseSets.entries());
+        for (let i = 0; i < entries.length; i++) {
+          const [oldIndex, sets] = entries[i];
+          if (index < this.exercises.length && this.exercises[oldIndex] === exercise) {
+            updatedTempSets.set(index, sets);
+            break;
+          }
+        }
+      }
+    });
+    
+    this.tempNewExerciseSets = updatedTempSets;
+  }
 
   async showToast(message: string) {
     const toast = await this.toastController.create({
       message: message,
       duration: 2000,
-      position: 'top', // Change position to top
-      cssClass: 'toast-notification' // Add a class for additional styling if needed
+      position: 'top',
+      cssClass: 'toast-notification'
     });
     await toast.present();
   }
 
-  getRestTimeDisplay(seconds: number): string {
-    if (seconds === 0) {
-      return 'Off';
-    } else if (seconds < 60) {
-      return `${seconds}s`;
-    } else {
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return remainingSeconds > 0 
-        ? `${minutes}m ${remainingSeconds}s` 
-        : `${minutes}m`;
-    }
-  }
-
   reorderExercises(event: CustomEvent<ItemReorderEventDetail>) {
-    // Move the item in the array
     const itemMove = this.exercises.splice(event.detail.from, 1)[0];
     this.exercises.splice(event.detail.to, 0, itemMove);
     
-    // Complete the reorder operation
     event.detail.complete();
 
-    // Update orderPosition for all exercises based on their index in the array
     this.exercises.forEach((exercise, index) => {
       exercise.orderPosition = index;
     });
     
-    // Create a new array reference to ensure change detection
     this.exercises = [...this.exercises];
+    this.changeDetector.markForCheck();
   }
 
   toggleLibrary(show: boolean): void {
@@ -687,95 +628,76 @@ private reindexTempExerciseSets() {
     this.router.navigate(['/tabs/workouts']);
   }
 
-  applyFilters() {
-  if (!this.exerciseTemplates || this.exerciseTemplates.length === 0) {
-    return;
-  }
-  
-  this.filteredTemplates = this.exerciseTemplates.filter(template => {
-    // Check if it matches muscle filter
-    const matchesMuscle = !this.muscleFilter || 
-      (template.targetMuscleGroups && 
-        template.targetMuscleGroups.some(muscle => 
-          muscle.toLowerCase() === this.muscleFilter.toLowerCase()));
+  updateSetValue(exerciseIndex: number, setIndex: number, property: string, event: any) {
+    if (exerciseIndex < 0 || exerciseIndex >= this.exercises.length) return;
     
-    // Check if it matches search query
-    const matchesSearch = !this.searchQuery || 
-      template.name.toLowerCase().includes(this.searchQuery.toLowerCase());
+    const exercise = this.exercises[exerciseIndex];
+    if (!exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
     
-    // Include only if it matches both criteria
-    return matchesMuscle && matchesSearch;
-  });
-}
-
-// Fixed updateSetValue method to properly update sets in edit routine flow
-updateSetValue(exerciseIndex: number, setIndex: number, property: string, event: any) {
-  if (exerciseIndex < 0 || exerciseIndex >= this.exercises.length) return;
-  
-  const exercise = this.exercises[exerciseIndex];
-  if (!exercise.sets || setIndex < 0 || setIndex >= exercise.sets.length) return;
-  
-  const set = exercise.sets[setIndex];
-  const value = Number(event.detail.value);
-  
-  // Update the value locally first for immediate UI feedback
-  switch(property) {
-    case 'reps':
-      set.reps = value;
-      break;
-    case 'weight':
-      set.weight = value;
-      break;
-    case 'restTimeSeconds':
-      set.restTimeSeconds = value;
-      break;
-    case 'type':
-      set.type = event.detail.value; // Don't convert type to number
-      break;
-    default:
-      console.warn(`Unknown property: ${property}`);
-      return;
-  }
-  
-  // Get current workout ID
-  const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
-  
-  // Skip backend calls when:
-  // 1. No workout ID (creating new routine)
-  // 2. No exercise ID (newly added exercise)
-  // 3. No set ID (newly added set)
-  if (!workoutId || !exercise.exerciseId || !set.exerciseSetId) {
-    console.log(`Skipping backend update for ${property}=${value} (local only)`);
-    return;
-  }
-  
-  // For real sets with real IDs, update via the backend API
-  const setPayload = {
-    exerciseSetId: set.exerciseSetId,
-    exerciseId: exercise.exerciseId,
-    type: set.type || 'NORMAL',
-    reps: set.reps || 0,
-    weight: set.weight || 0,
-    restTimeSeconds: set.restTimeSeconds || 0,
-    orderPosition: set.orderPosition || 0
-  };
-  
-  console.log(`Updating ${property} for set ${set.exerciseSetId} to ${value}`);
-  
-  // Call the backend using the endpoint
-  this.workoutService.updateExerciseSet(
-    workoutId,
-    exercise.exerciseId,
-    set.exerciseSetId,
-    setPayload
-  ).subscribe({
-    next: () => {
-      console.log(`Successfully updated ${property} for set ${set.exerciseSetId}`);
-    },
-    error: (error) => {
-      console.error(`Error updating ${property} for set:`, error);
-      this.showToast(`Failed to update ${property}`);
+    const set = exercise.sets[setIndex];
+    const value = Number(event.detail.value);
+    
+    switch(property) {
+      case 'reps':
+        set.reps = value;
+        break;
+      case 'weight':
+        set.weight = value;
+        break;
+      case 'restTimeSeconds':
+        set.restTimeSeconds = value;
+        break;
+      case 'type':
+        set.type = event.detail.value;
+        break;
+      default:
+        console.warn(`Unknown property: ${property}`);
+        return;
     }
-  });
-}
+      const workoutId = this.route.snapshot.queryParamMap.get('workoutId');
+    
+    if (!workoutId || !exercise.exerciseId || !set.exerciseSetId) {
+      console.log(`Skipping backend update for ${property}=${value} (local only)`);
+      return;
+    }
+    
+    const setPayload = {
+      exerciseSetId: set.exerciseSetId,
+      exerciseId: exercise.exerciseId,
+      type: set.type || 'NORMAL',
+      reps: set.reps || 0,
+      weight: set.weight || 0,
+      restTimeSeconds: set.restTimeSeconds || 0,
+      orderPosition: set.orderPosition || 0
+    };
+    
+    console.log(`Updating ${property} for set ${set.exerciseSetId} to ${value}`);
+    
+    this.workoutService.updateExerciseSet(
+      workoutId,
+      exercise.exerciseId,
+      set.exerciseSetId,
+      setPayload
+    ).subscribe({
+      next: () => {
+        console.log(`Successfully updated ${property} for set ${set.exerciseSetId}`);
+      },
+      error: (error) => {
+        console.error(`Error updating ${property} for set:`, error);
+        this.showToast(`Failed to update ${property}`);
+      }
+    });
+  }
+
+  trackByExercise(index: number, exercise: Exercise): any {
+    return exercise.exerciseTemplateId || index;
+  }
+
+  handleImageError(event: Event): void {
+  const imgElement = event.target as HTMLImageElement;
+    if (imgElement) {
+      imgElement.src = 'assets/logo/athletiq-logo.jpeg';
+    }
+  }
+
 }

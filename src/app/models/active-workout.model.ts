@@ -9,6 +9,5 @@ export interface ActiveWorkout extends Workout {
     startTime?: string;
     endTime?: string;
     duration?: string;
-    // Add this property
     elapsedTimeSeconds?: number;
 }

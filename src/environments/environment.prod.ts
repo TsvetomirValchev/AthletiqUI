@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://localhost:6969'
+  apiUrl: 'https://athletiq-5o6z.onrender.com'
 };

@@ -53,7 +53,6 @@ export class RegisterPage implements OnInit {
     } else {
       console.log('Form validation errors:', this.registerForm.errors);
       
-      // Show which fields have errors
       Object.keys(this.registerForm.controls).forEach(key => {
         const control = this.registerForm.get(key);
         if (control?.invalid) {

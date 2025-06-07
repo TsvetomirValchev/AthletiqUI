@@ -1,21 +1,17 @@
 <ion-content class="create-routine-page">
   <div class="main-container">
-    <!-- Left Side: Routine Creation -->
     <div class="routine-container" [class.empty-routine]="exercises.length === 0">
       <div class="routine-header">
       </div>
 
       <form [formGroup]="routineForm">
-        <!-- Routine Title -->
         <div class="title-section">
           <div class="title-label">Routine Title</div>
           <input formControlName="name" placeholder="Enter routine name" class="title-input">
         </div>
 
-        <!-- Add ion-reorder-group here to properly wrap the exercise cards -->
         <ion-reorder-group (ionItemReorder)="reorderExercises($event)" disabled="false">
-          <!-- Exercise Cards -->
-          <div *ngFor="let exercise of exercises; let exerciseIndex = index" class="exercise-card">
+          <div *ngFor="let exercise of (exercises | sort:'orderPosition'); let exerciseIndex = index; trackBy: trackByExercise" class="exercise-card">
             <div class="exercise-header">
               <div class="exercise-handle">
                 <ion-reorder>
@@ -23,7 +19,9 @@
                 </ion-reorder>
               </div>
               <div class="exercise-avatar">
-                <img [src]="'assets/exercise-icons/barbell.png'" alt="Exercise">
+                <img [src]="exercise.name | exerciseImage" 
+                     alt="{{exercise.name}}"
+                     (error)="handleImageError($event)">
               </div>
               <div class="exercise-title">{{ exercise.name }}</div>
               <div class="exercise-options">
@@ -33,21 +31,19 @@
               </div>
             </div>
 
-            <!-- Note Section -->
             <div class="notes-section">
               <div class="section-label">Note</div>
               <textarea [(ngModel)]="exercise.notes" [ngModelOptions]="{standalone: true}" 
                 placeholder="Add pinned note" class="note-input"></textarea>
             </div>
 
-            <!-- Rest Timer -->
             <div class="timer-section">
               <div class="section-label">Rest Timer:</div>
               <ion-select 
                 [(ngModel)]="exercise.restTimeSeconds" 
                 [ngModelOptions]="{standalone: true}" 
                 interface="popover" 
-                [selectedText]="getRestTimeDisplay(exercise.restTimeSeconds || 0)">
+                [selectedText]="(exercise.restTimeSeconds || 0) | time:'rest'">
                 <ion-select-option value="0">Off</ion-select-option>
                 <ion-select-option value="15">15s</ion-select-option>
                 <ion-select-option value="30">30s</ion-select-option>
@@ -72,7 +68,6 @@
               </ion-select>
             </div>
 
-            <!-- Replace the section displaying sets with this -->
             <div class="sets-section">
               <div class="sets-header">
                 <div class="set-col">SET</div>
@@ -81,7 +76,6 @@
                 <div class="remove-col"></div>
               </div>
               
-              <!-- Update your set-row to ensure proper alignment -->
               <div *ngFor="let set of exercise.sets; let setIndex = index" class="set-row">
                 <div class="set-col">
                   <ion-select [(ngModel)]="set.type" 
@@ -94,11 +88,12 @@
                       'normal-type': set.type === SetType.NORMAL
                     }"
                     interface="popover"
+                    [selectedText]="set.type | setTypeDisplay: exercise.sets : setIndex"
                     (ionChange)="onSetTypeChange(exercise.sets, setIndex)">
-                    <ion-select-option [value]="SetType.NORMAL">{{ getNormalSetNumber(exercise.sets, setIndex) }}</ion-select-option>
-                    <ion-select-option [value]="SetType.WARMUP">W</ion-select-option>
-                    <ion-select-option [value]="SetType.DROPSET">D</ion-select-option>
-                    <ion-select-option [value]="SetType.FAILURE">F</ion-select-option>
+                    <ion-select-option [value]="SetType.NORMAL">{{ SetType.NORMAL | setTypeDisplay: exercise.sets : setIndex }} - Normal Set</ion-select-option>
+                    <ion-select-option [value]="SetType.WARMUP">W - Warmup Set</ion-select-option>
+                    <ion-select-option [value]="SetType.DROPSET">D - Drop Set</ion-select-option>
+                    <ion-select-option [value]="SetType.FAILURE">F - Failure Set</ion-select-option>
                   </ion-select>
                 </div>
                 <div class="kg-col">
@@ -158,7 +153,6 @@
       </form>
     </div>
 
-    <!-- Empty state - only show when there are no exercises -->
     <div class="empty-state-container" *ngIf="exercises.length === 0">
       <ion-icon name="barbell-outline"></ion-icon>
       <div class="empty-title">No Exercises Added</div>
@@ -173,21 +167,18 @@
       </button>
     </div>
 
-    <!-- Replace the library container section with this improved version -->
     <div class="library-container" [ngClass]="{'active': showLibraryOnMobile}">
       <div class="library-header">
         <div class="library-title">Library</div>
       </div>
 
-      <!-- Add this to your library-container section -->
       <div class="desktop-library-header" *ngIf="exercises.length > 0">
         <div class="section-title">Exercise Library</div>
         <div class="subtitle">Click on an exercise to add it to your routine</div>
       </div>
 
-      <!-- Replace the library-filters section with this: -->
       <div class="library-filters">
-        <select class="filter-select" [(ngModel)]="muscleFilter" (change)="applyFilters()">
+        <select class="filter-select" [(ngModel)]="muscleFilter">
           <option value="">All Muscles</option>
           <option value="chest">Chest</option>
           <option value="back">Back</option>
@@ -202,16 +193,20 @@
 
       <div class="search-bar">
         <ion-icon name="search-outline"></ion-icon>
-        <input type="text" placeholder="Search Exercises" class="search-input">
+        <input type="text" placeholder="Search Exercises" class="search-input" [(ngModel)]="searchQuery">
       </div>
 
       <div class="exercise-list-container">
         <div class="exercises-section">
           <div class="section-title">Exercises</div>
           
-          <div *ngFor="let template of exerciseTemplates" class="exercise-item" (click)="addExerciseFromTemplate(template)">
+          <div *ngFor="let template of (exerciseTemplates | exerciseFilter:searchQuery:muscleFilter)" 
+               class="exercise-item" 
+               (click)="addExerciseFromTemplate(template)">
             <div class="exercise-item-avatar">
-              <img src="assets/exercise-icons/barbell.png" alt="Exercise">
+              <img [src]="template.name | exerciseImage" 
+                   alt="{{template.name}}"
+                   (error)="handleImageError($event)">
             </div>
             <div class="exercise-item-details">
               <div class="exercise-item-name">{{ template.name }}</div>

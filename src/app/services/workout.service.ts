@@ -28,7 +28,6 @@ export class WorkoutService implements OnDestroy {
     private exerciseTemplateService: ExerciseTemplateService,
     private activeWorkoutService: ActiveWorkoutService
   ) {
-    // Listen for workout modifications from ActiveWorkoutService
     this.subscriptions.add(
       this.activeWorkoutService.workoutModified$.subscribe(workoutId => {
         console.log(`Workout ${workoutId} was modified, refreshing workouts data`);
@@ -41,9 +40,6 @@ export class WorkoutService implements OnDestroy {
     this.subscriptions.unsubscribe();
   }
   
-  /**
-   * Generic error handler for HTTP requests
-   */
   private handleError(operation: string, fallbackValue: any = null) {
     return catchError(error => {
       console.error(`Error in ${operation}:`, error);
@@ -51,9 +47,6 @@ export class WorkoutService implements OnDestroy {
     });
   }
 
-  /**
-   * Get all workouts for the current user
-   */
   public getUserWorkouts(): Observable<Workout[]> {
     if (this.workoutsCache) {
       return of(this.workoutsCache);
@@ -67,57 +60,36 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Get workout by ID
-   */
   public getById(id: string): Observable<Workout> {
     return this.http.get<Workout>(`${this.apiUrl}/${id}`)
       .pipe(this.handleError('getById'));
   }
 
-  /**
-   * Create a new workout
-   */
   public createWorkout(workout: Workout): Observable<Workout> {
     return this.http.post<Workout>(this.apiUrl, workout)
       .pipe(this.handleError('createWorkout'));
   }
 
-  /**
-   * Update an existing workout
-   */
   public update(id: string, workout: Workout): Observable<Workout> {
     return this.http.put<Workout>(`${this.apiUrl}/${id}`, workout)
       .pipe(this.handleError('update'));
   }
 
-  /**
-   * Delete a workout by ID
-   */
   public deleteWorkout(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`)
       .pipe(this.handleError('deleteWorkout'));
   }
 
-  /**
-   * Get exercise sets for a specific exercise in a workout
-   */
   public getExerciseSetsForExercise(workoutId: string, exerciseId: string): Observable<ExerciseSet[]> {
     return this.http.get<ExerciseSet[]>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets`)
       .pipe(this.handleError('getExerciseSetsForExercise', []));
   }
 
-  /**
-   * Get a specific exercise from a workout
-   */
   public getWorkoutExerciseById(workoutId: string, exerciseId: string): Observable<Exercise> {
     return this.http.get<Exercise>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}`)
       .pipe(this.handleError('getWorkoutExerciseById'));
   }
 
-  /**
-   * Add an exercise to a workout
-   */
   public addExerciseToWorkout(workoutId: string, exerciseTemplateId: string): Observable<Workout> {
     return this.http.post<Workout>(
       `${this.apiUrl}/${workoutId}/exercises`, 
@@ -128,9 +100,6 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Add a set to an exercise
-   */
   public addSetToExercise(workoutId: string, exerciseId: string, set: ExerciseSet): Observable<Workout> {
     const setPayload = {
       ...set,
@@ -146,9 +115,6 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Get all exercises for a workout with populated template names
-   */
   public getExercisesForWorkout(workoutId: string): Observable<Exercise[]> {
     return this.http.get<Exercise[]>(`${this.apiUrl}/${workoutId}/exercises`).pipe(
       switchMap(exercises => {
@@ -156,17 +122,14 @@ export class WorkoutService implements OnDestroy {
           return of([]);
         }
         
-        // Get all the template IDs from exercises
         const templateIds = exercises
           .filter(ex => ex.exerciseTemplateId)
           .map(ex => ex.exerciseTemplateId!);
         
-        // If no templates to fetch, just return exercises
         if (templateIds.length === 0) {
           return of(exercises);
         }
         
-        // Fetch templates for each exercise that has a template ID
         const templateRequests = exercises
           .filter(ex => ex.exerciseTemplateId)
           .map(ex => 
@@ -185,13 +148,10 @@ export class WorkoutService implements OnDestroy {
               )
           );
 
-        // Merge template data with exercises
         return forkJoin(templateRequests).pipe(
           map(templates => {
-            // Create a map of exercise ID to template name
             const nameMap = new Map(templates.map(t => [t.exerciseId, t.templateName]));
             
-            // Update each exercise with its template name if needed
             return exercises.map(ex => {
               if (ex.exerciseId && nameMap.has(ex.exerciseId) && !ex.name) {
                 return {
@@ -208,20 +168,13 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Check if there is an active workout in progress
-   */
   public isActiveWorkoutInProgress(): Observable<boolean> {
-    // Use the workoutState$ observable which already has an isActive property
     return this.activeWorkoutService.workoutState$.pipe(
       map(state => state.isActive),
       this.handleError('isActiveWorkoutInProgress', false)
     );
   }
 
-  /**
-   * Start a workout
-   */
   public startWorkout(workout: Workout): Observable<any> {
     const activeWorkout = {
       ...workout,
@@ -231,18 +184,11 @@ export class WorkoutService implements OnDestroy {
       .pipe(this.handleError('startWorkout'));
   }
 
-  /**
-   * Get all exercise templates
-   */
   public getExerciseTemplates(): Observable<ExerciseTemplate[]> {
     return this.exerciseTemplateService.getAllTemplates()
       .pipe(this.handleError('getExerciseTemplates', []));
   }
 
-  /**
-   * Create a workout with exercises and sets in a sequential manner
-   * using separate endpoint calls for each component
-   */
   public createWorkoutWithExercises(workout: Workout, exercises: Exercise[]): Observable<Workout> {
     console.log('Creating workout with exercises through separate endpoint calls:', {
       workoutName: workout.name,
@@ -254,15 +200,12 @@ export class WorkoutService implements OnDestroy {
       }))
     });
     
-    // First create the workout
     return this.http.post<Workout>(`${this.apiUrl}`, workout).pipe(
-      // Process each exercise sequentially
       switchMap(createdWorkout => {
         if (!exercises.length) {
           return of(createdWorkout);
         }
         
-        // Track which sets we've already processed to avoid duplicates
         const processedSets = new Map<string, boolean>();
         
         return from(exercises).pipe(
@@ -284,15 +227,11 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Helper method to create an exercise with its sets
-   */
   private createExerciseWithSets(
     workoutId: string, 
     exercise: Exercise, 
     processedSets: Map<string, boolean>
   ): Observable<any> {
-    // Create a clean copy of the exercise WITHOUT sets
     const exercisePayload = {
       ...exercise,
       workoutId: workoutId,
@@ -302,7 +241,6 @@ export class WorkoutService implements OnDestroy {
     
     console.log(`Creating exercise with template ID: ${exercisePayload.exerciseTemplateId}`);
     
-    // First create the exercise
     return this.http.post<any>(
       `${this.apiUrl}/${workoutId}/exercises`, 
       exercisePayload
@@ -311,7 +249,6 @@ export class WorkoutService implements OnDestroy {
         console.log('Exercise creation response:', response);
       }),
       switchMap(response => {
-        // Get the exercise ID from the response
         let exerciseId: string | undefined;
         
         if (response.exerciseId) {
@@ -324,14 +261,12 @@ export class WorkoutService implements OnDestroy {
           return throwError(() => new Error('Created exercise has no valid ID'));
         }
         
-        // If no sets, we're done
         if (!exercise.sets || exercise.sets.length === 0) {
           return of({ ...response, exerciseId });
         }
         
         console.log(`Adding ${exercise.sets.length} sets to exercise ${exerciseId}`);
         
-        // Filter duplicate sets using a unique key for each set
         const uniqueSets = exercise.sets.filter(set => {
           const setKey = `${exerciseId}-${set.weight}-${set.reps}-${set.type}-${set.orderPosition}`;
           if (processedSets.has(setKey)) {
@@ -341,7 +276,6 @@ export class WorkoutService implements OnDestroy {
           return true;
         });
         
-        // Process each set sequentially
         return from(uniqueSets).pipe(
           concatMap((set, index) => {
             const setPayload = {
@@ -373,9 +307,6 @@ export class WorkoutService implements OnDestroy {
     );
   }
   
-  /**
-   * Get workouts with their exercises
-   */
   public getWorkoutsWithExercises(): Observable<{workout: Workout, exercises: Exercise[]}[]> {
     return this.getUserWorkouts().pipe(
       switchMap(workouts => {
@@ -400,23 +331,17 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Load an exercise with all its sets
-   */
   public loadExerciseWithSets(workoutId: string, exerciseId: string): Observable<Exercise> {
     return this.http.get<Exercise>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}`)
       .pipe(
         switchMap(exercise => {
-          // Load sets for this exercise
           return this.http.get<ExerciseSet[]>(
             `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets`
           ).pipe(
             map(sets => {
-              // Sort sets by order position
               const sortedSets = sets.sort((a, b) => 
                 (a.orderPosition || 0) - (b.orderPosition || 0));
             
-              // Assign sets to the exercise
               return {
                 ...exercise,
                 sets: sortedSets
@@ -424,7 +349,6 @@ export class WorkoutService implements OnDestroy {
             }),
             catchError(error => {
               console.error('Error loading sets:', error);
-              // Return the exercise without sets if there's an error
               return of({
                 ...exercise,
                 sets: []
@@ -435,25 +359,18 @@ export class WorkoutService implements OnDestroy {
       );
   }
 
-  /**
-   * Force refresh workouts data
-   */
   public refreshWorkouts(): Observable<void> {
     console.log('WorkoutService: Refreshing workouts data');
-    this.workoutsCache = null; // Clear cache
-    this.workoutsRefreshSubject.next(); // Notify subscribers
-    return of(undefined); // Return observable
+    this.workoutsCache = null;
+    this.workoutsRefreshSubject.next();
+    return of(undefined);
   }
 
-  /**
-   * Remove an exercise from a workout
-   */
   public removeExerciseFromWorkout(workoutId: string, exerciseId: string): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/${workoutId}/exercises/${exerciseId}`)
       .pipe(
         tap(() => {
           console.log(`Exercise ${exerciseId} removed from workout ${workoutId}`);
-          // Clear any cached data
           if (this.workoutsCache) {
             this.workoutsCache = null;
           }
@@ -466,9 +383,6 @@ export class WorkoutService implements OnDestroy {
       );
   }
 
-  /**
-   * Remove a set from an exercise
-   */
   removeSetFromExercise(
     workoutId: string, 
     exerciseId: string, 
@@ -479,7 +393,6 @@ export class WorkoutService implements OnDestroy {
     ).pipe(
       tap(() => {
         console.log(`Set ${orderPosition} removed from exercise ${exerciseId}`);
-        // Clear any cached data
         if (this.workoutsCache) {
           this.workoutsCache = null;
         }
@@ -492,60 +405,46 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  /**
-   * Updates a workout template with the given exercises
-   */
   updateWorkoutWithExercises(workout: Workout, exercises: Exercise[]): Observable<Workout> {
-    // First update the workout basic info
     return this.http.patch<Workout>(`${this.apiUrl}/${workout.workoutId}`, workout).pipe(
       switchMap(() => {
         if (!exercises.length) {
           return of(workout);
         }
         
-        // Process each exercise sequentially
         return from(exercises).pipe(
           concatMap(exercise => {
-            // Check if this is a real exercise ID or a temporary ID
             const isRealExerciseId = exercise.exerciseId && 
               !exercise.exerciseId.toString().startsWith('temp-') && 
               !exercise.tempId;
             
             if (isRealExerciseId) {
-              // For existing exercises, update the exercise first
               console.log(`Updating existing exercise ${exercise.name} (${exercise.exerciseId})`);
               
-              // Create a payload without sets for the exercise update
               const { sets, ...exerciseWithoutSets } = exercise;
               
-              // Update the exercise first
               return this.http.put<Exercise>(
                 `${this.apiUrl}/${workout.workoutId}/exercises/${exercise.exerciseId}`, 
                 exerciseWithoutSets
               ).pipe(
-                // Then handle sets separately using the appropriate endpoints
                 switchMap(updatedExercise => {
                   console.log(`Updated exercise ${exercise.name} (ID: ${exercise.exerciseId})`);
                   if (!exercise.sets || exercise.sets.length === 0) {
                     return of(updatedExercise);
                   }
                   
-                  // Process each set separately using the sets endpoint
                   console.log(`Processing ${exercise.sets.length} sets for existing exercise ${exercise.exerciseId}`);
                   
                   return from(exercise.sets).pipe(
                     concatMap((set, index) => {
-                      // Make sure each set has correct orderPosition
                       const setWithOrderPosition = {
                         ...set,
                         exerciseId: exercise.exerciseId,
                         orderPosition: index
                       };
                       
-                      // Remove properties that shouldn't be sent
                       const { tempId, completed, ...cleanSet } = setWithOrderPosition;
                       
-                      // If the set has an ID, update it, otherwise create a new one
                       if (set.exerciseSetId && !set.exerciseSetId.toString().startsWith('temp-')) {
                         console.log(`Updating existing set ${set.exerciseSetId}`);
                         return this.http.put<ExerciseSet>(
@@ -554,7 +453,7 @@ export class WorkoutService implements OnDestroy {
                         ).pipe(
                           catchError(error => {
                             console.error(`Error updating set ${set.exerciseSetId}:`, error);
-                            return of(null); // Continue with other sets even if one fails
+                            return of(null);
                           })
                         );
                       } else {
@@ -565,7 +464,7 @@ export class WorkoutService implements OnDestroy {
                         ).pipe(
                           catchError(error => {
                             console.error('Error creating set:', error);
-                            return of(null); // Continue with other sets even if one fails
+                            return of(null);
                           })
                         );
                       }
@@ -580,14 +479,11 @@ export class WorkoutService implements OnDestroy {
                 })
               );
             } else {
-              // This is a new exercise (either no ID or temporary ID)
               console.log(`Creating new exercise ${exercise.name} (temp: ${exercise.tempId || 'none'})`);
               
-              // Extract sets to handle separately
               const { sets, tempId, exerciseId, ...exerciseWithoutTempFields } = exercise;
               const exerciseSets = sets || [];
               
-              // Create the exercise first without sets or temp fields
               return this.http.post<Exercise>(
                 `${this.apiUrl}/${workout.workoutId}/exercises`, 
                 exerciseWithoutTempFields
@@ -598,12 +494,10 @@ export class WorkoutService implements OnDestroy {
                     return of(createdExercise);
                   }
                   
-                  // Now create each set using the dedicated endpoint
                   console.log(`Creating ${exerciseSets.length} sets for new exercise ${createdExercise.exerciseId}`);
                   
                   return from(exerciseSets).pipe(
                     concatMap((set, index) => {
-                      // Prepare set with the new exercise ID and correct order
                       const newSet = {
                         type: set.type || 'NORMAL',
                         reps: set.reps || 0,
@@ -622,7 +516,7 @@ export class WorkoutService implements OnDestroy {
                         tap(response => console.log(`Created set response:`, response)),
                         catchError(error => {
                           console.error('Error creating set for new exercise:', error);
-                          return of(null); // Continue with other sets even if one fails
+                          return of(null);
                         })
                       );
                     }),
@@ -652,7 +546,6 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  // Add this method to WorkoutService
   updateExercise(workoutId: string, exerciseId: string, exerciseDTO: any): Observable<any> {
     return this.http.put(`${this.apiUrl}/workouts/${workoutId}/exercises/${exerciseId}`, exerciseDTO);
   }

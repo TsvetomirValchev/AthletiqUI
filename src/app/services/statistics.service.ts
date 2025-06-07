@@ -4,9 +4,6 @@ import { Observable, of } from 'rxjs';
 import { catchError, switchMap, retry } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-
-// Import the model interfaces directly from their respective files
-import { MuscleGroupStats } from '../models/muscle-group-stats.model';
 import { CalendarDayData } from '../models/calendar-day-data.model';
 import { WorkoutStreakData } from '../models/workout-streak-data.model';
 
@@ -29,10 +26,7 @@ export class StatisticsService {
   ) {
     console.log('Statistics service initialized with API URL:', this.apiUrl);
   }
-  
-  /**
-   * Get workout streak data from the API
-   */
+
   getWorkoutStreaks(): Observable<WorkoutStreakData> {
     return this.authService.currentUser$.pipe(
       switchMap(user => {
@@ -55,9 +49,6 @@ export class StatisticsService {
     );
   }
 
-  /**
-   * Get calendar data for a specific month
-   */
   getCalendarData(year: number, month: number): Observable<CalendarDayData[]> {
     return this.authService.currentUser$.pipe(
       switchMap(user => {
@@ -79,10 +70,7 @@ export class StatisticsService {
       })
     );
   }
-  
-  /**
-   * Get muscle group distribution statistics
-   */
+
   getMuscleGroupStats(): Observable<any[]> {
     return this.authService.currentUser$.pipe(
       switchMap(user => {
@@ -105,10 +93,6 @@ export class StatisticsService {
     );
   }
 
-  /**
-   * Calculate duration in minutes from ISO 8601 duration string
-   * Example: PT1H30M15S -> 90.25 minutes
-   */
   calculateDurationInMinutes(isoDuration: string): number {
     if (!isoDuration) return 0;
     

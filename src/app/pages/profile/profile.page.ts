@@ -3,20 +3,16 @@ import { IonicModule } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { FormatDurationPipe } from '../../pipes/format-duration.pipe';
-import { ProfileService, UserProfile } from '../../services/profile.service';
+import { ProfileService } from '../../services/profile.service';
 import { WorkoutHistoryService } from '../../services/workout-history.service';
 import { WorkoutHistory } from '../../models/workout-history.model';
 import { ExerciseHistory } from '../../models/exercise-history.model';
-import { SetHistory } from '../../models/set-history.model';
 import { AuthService } from '../../services/auth.service';
-import { finalize, switchMap } from 'rxjs/operators';
-import { of, forkJoin, Observable, Subscription, BehaviorSubject } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+import { of, forkJoin, Subscription, BehaviorSubject } from 'rxjs';
 import { ToastController } from '@ionic/angular';
-import { ExerciseImageService } from '../../services/exercise-image.service';
-import { SetType } from '../../models/set-type.enum';
+import { ExerciseImagePipe, } from '../../pipes/exercise-image.pipe';
 
-// Interface to extend ExerciseHistory with UI state
 interface ExerciseHistoryWithUIState extends ExerciseHistory {
   showSets?: boolean;
 }
@@ -26,17 +22,22 @@ interface ExerciseHistoryWithUIState extends ExerciseHistory {
   templateUrl: './profile.page.html',
   styleUrls: ['./profile.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, RouterLink]
+  imports: [
+    IonicModule,
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ExerciseImagePipe,
+  ],
+  providers: [ExerciseImagePipe]
 })
 export class ProfilePage implements OnInit, OnDestroy {
-  // User profile data
   username: string = '';
   totalWorkouts: number = 0;
   hoursActive: number = 0;  daysActive: number = 0;
   userId: string | null = null;
-  public showDebug = true; // Set this to false in production
+  public showDebug = true;
   
-  // Workout history
   workoutHistory: WorkoutHistory[] = [];
   expandedWorkoutId: string | null = null;
   expandedWorkoutDetails: WorkoutHistory | null = null;
@@ -44,10 +45,8 @@ export class ProfilePage implements OnInit, OnDestroy {
   loadingDetails: boolean = false;
   expandedWorkoutIndex: number | null = null;
 
-  // Map to track expanded exercise states
   exerciseVisibilityMap: Map<string, boolean> = new Map();
 
-  // Add this property
   private subscriptions: Subscription = new Subscription();
   private refreshTrigger = new BehaviorSubject<boolean>(true);
   
@@ -56,14 +55,12 @@ export class ProfilePage implements OnInit, OnDestroy {
     private workoutHistoryService: WorkoutHistoryService,
     private authService: AuthService,
     private toastController: ToastController,
-    private exerciseImageService: ExerciseImageService,
     private changeDetector: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.loadUserProfile();
     
-    // Subscribe to history refresh events
     this.subscriptions.add(
       this.workoutHistoryService.historyRefresh$.subscribe(() => {
         console.log('History refresh event received in profile page');
@@ -76,14 +73,10 @@ export class ProfilePage implements OnInit, OnDestroy {
     this.loadUserProfile();
   }
 
-  // Add ngOnDestroy to clean up subscriptions
   ngOnDestroy() {
     this.subscriptions.unsubscribe();
   }
 
-  /**
-   * Load user profile and workout statistics
-   */
   loadUserProfile() {
     this.authService.currentUser$.pipe(
       switchMap(user => {
@@ -139,9 +132,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Load workout history data with complete details
-   */
   loadWorkoutHistory() {
     this.isLoading = true;
     console.log('Loading workout history...');
@@ -158,11 +148,10 @@ export class ProfilePage implements OnInit, OnDestroy {
             console.warn(`Warning: ${missingIds} workout(s) have missing IDs`);
           }
           
-          // Load details for each workout
           this.loadAllWorkoutDetails(history);
         } else {
           this.workoutHistory = [];
-          this.totalWorkouts = 0; // Set to 0 if no workouts
+          this.totalWorkouts = 0;
           this.isLoading = false;
         }
       },
@@ -174,9 +163,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Load details for all workouts
-   */
   loadAllWorkoutDetails(workouts: WorkoutHistory[]) {
     if (!workouts || workouts.length === 0) {
       this.workoutHistory = [];
@@ -216,9 +202,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Toggle displaying workout details
-   */
   toggleWorkoutDetails(workoutId: string | undefined) {
     console.log('Toggle workout details called with ID:', workoutId);
     
@@ -253,9 +236,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Toggle displaying workout details using array index
-   */
   toggleWorkoutDetailsByIndex(index: number, workoutId?: string) {
     
     const workout = this.workoutHistory[index];
@@ -285,7 +265,6 @@ export class ProfilePage implements OnInit, OnDestroy {
       next: (details) => {        
         console.log('Workout details loaded successfully:', details);
         
-        // Sort sets within each exercise by order position
         this.ensureSortedSets(details);
         
         if (details.exerciseHistories) {
@@ -307,9 +286,9 @@ export class ProfilePage implements OnInit, OnDestroy {
         this.showToast('Error loading workout details');
       }
     });
-  }  /**
-   * Initialize exercise visibility map for a workout
-   */  private initializeExerciseVisibility(workout: WorkoutHistory): void {
+  }
+  
+  private initializeExerciseVisibility(workout: WorkoutHistory): void {
     if (!workout.exerciseHistories) return;
     
     workout.exerciseHistories.forEach(exercise => {
@@ -319,22 +298,18 @@ export class ProfilePage implements OnInit, OnDestroy {
       this.exerciseVisibilityMap.set(key, false);
     });
   }
-    /**
-   * Create a unique key for an exercise to track its visibility state
-   */
+  
   getExerciseKey(exercise: ExerciseHistoryWithUIState): string {
     return `${exercise.exerciseHistoryId || ''}-${exercise.exerciseName}-${exercise.orderPosition}`;
   }
 
-    toggleExerciseSets(exercise: ExerciseHistoryWithUIState): void {
+  toggleExerciseSets(exercise: ExerciseHistoryWithUIState): void {
     const key = this.getExerciseKey(exercise);
     const currentValue = this.exerciseVisibilityMap.get(key) || false;
     
     this.exerciseVisibilityMap.set(key, !currentValue);
     
-    // Force refresh when sets are displayed
     if (!currentValue) {
-      // A small delay to ensure sets are rendered first
       setTimeout(() => {
         this.refreshTrigger.next(true);
         this.changeDetector.detectChanges();
@@ -342,18 +317,12 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   }
   
-  /**
-   * Helper method for the template to get exercise visibility state
-   * This is safe to use in template expressions
-   */
   getExerciseVisibility(exercise: ExerciseHistoryWithUIState): boolean {
     const key = this.getExerciseKey(exercise);
     return this.exerciseVisibilityMap.get(key) || false;
   }
 
-  /**
-   * Calculate total sets from a workout
-   */  calculateTotalSets(workout: WorkoutHistory): number {
+  calculateTotalSets(workout: WorkoutHistory): number {
     if (!workout.exerciseHistories) return 0;
     
     return workout.exerciseHistories.reduce((total, exercise) => {
@@ -361,9 +330,7 @@ export class ProfilePage implements OnInit, OnDestroy {
     }, 0);
   }
 
-  /**
-   * Calculate total volume (weight × reps) for a workout
-   */  calculateTotalVolume(workout: WorkoutHistory): number {
+  calculateTotalVolume(workout: WorkoutHistory): number {
     let volume = 0;
     if (workout.exerciseHistories) {
       for (const exercise of workout.exerciseHistories) {
@@ -379,9 +346,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     return volume;
   }
 
-  /**
-   * Show a toast message
-   */
   async showToast(message: string) {
     const toast = await this.toastController.create({
       message,
@@ -392,139 +356,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     await toast.present();
   }
 
-  /**
-   * Format duration for display
-   */
-  formatDuration(isoDuration: string): string {
-    const durationSeconds = this.parseDuration(isoDuration);
-    
-    if (durationSeconds < 60) {
-      return `${durationSeconds}s`;
-    } else if (durationSeconds < 3600) {
-      const minutes = Math.floor(durationSeconds / 60);
-      const seconds = durationSeconds % 60;
-      return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-    } else {
-      const hours = Math.floor(durationSeconds / 3600);
-      const minutes = Math.floor((durationSeconds % 3600) / 60);
-      if (minutes > 0) {
-        return `${hours}h ${minutes}m`;
-      } else {
-        return `${hours}h`;
-      }
-    }
-  }
-
-  /**
-   * Parse an ISO 8601 duration string into seconds
-   */
-  parseDuration(isoDuration: string): number {
-    if (!isoDuration) return 0;
-    
-    // Simple parsing of PT[hours]H[minutes]M[seconds]S format
-    let seconds = 0;
-    
-    // Hours
-    const hoursMatch = isoDuration.match(/(\d+)H/);
-    if (hoursMatch) {
-      seconds += parseInt(hoursMatch[1]) * 3600;
-    }
-    
-    // Minutes
-    const minutesMatch = isoDuration.match(/(\d+)M/);
-    if (minutesMatch) {
-      seconds += parseInt(minutesMatch[1]) * 60;
-    }
-    
-    // Seconds
-    const secondsMatch = isoDuration.match(/(\d+)S/);
-    if (secondsMatch) {
-      seconds += parseInt(secondsMatch[1]);
-    }
-    
-    return seconds;
-  }
-
-  /**
-   * Get image URL for an exercise
-   */
-  getExerciseImage(exerciseName: string): string {
-    return this.exerciseImageService.getExerciseImageUrl(exerciseName);
-  }
-
-  /**
-   * Handle image loading errors
-   */
-  handleImageError(event: any): void {
-    this.exerciseImageService.handleImageError(event);
-  }
-
-  /**
-   * Get the CSS class for a set type
-   */
-  getSetTypeClass(type?: string): string {
-    if (!type) return 'normal-type';
-    
-    switch (type) {
-      case 'WARMUP':
-        return 'warmup-type';
-      case 'DROPSET':
-        return 'dropset-type';
-      case 'FAILURE':
-        return 'failure-type';
-      default:
-        return 'normal-type';
-    }
-  }
-
-  /**
-   * Get display label for a set - direct fix that explicitly forces correct numbering
-   */
-  getSetDisplay(set: SetHistory, exercise?: ExerciseHistory): string {
-    console.log(`getSetDisplay called for set:`, set); // Debug to verify method is called
-  
-    // First check for special types - these return letters
-    if (set.type && set.type !== 'NORMAL') {
-      if (set.type === 'WARMUP') return 'W';
-      if (set.type === 'DROPSET') return 'D';
-      if (set.type === 'FAILURE') return 'F';
-    }
-
-    // For normal sets, we need to track which normal set number this is
-    if (!exercise?.exerciseSetHistories) return '1';
-    
-    // Get all sets sorted by order position
-    const sortedSets = [...exercise.exerciseSetHistories]
-      .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0));
-    
-    // Find the index of the current set in the sorted array
-    const currentSetIndex = sortedSets.findIndex(s => 
-      s === set || // Direct object reference comparison
-      (s.setHistoryId && s.setHistoryId === set.setHistoryId) || // ID comparison if available
-      (s.orderPosition === set.orderPosition && s.weight === set.weight && s.reps === set.reps) // Property comparison
-    );
-    
-    if (currentSetIndex === -1) {
-      console.warn('Could not find set in exercise:', set);
-      return '1';
-    }
-    
-    // Count normal sets up to and including this one
-    let normalSetCounter = 0;
-    
-    for (let i = 0; i <= currentSetIndex; i++) {
-      const currentSet = sortedSets[i];
-      if (!currentSet.type || currentSet.type === 'NORMAL') {
-        normalSetCounter++;
-      }
-    }
-    
-    return normalSetCounter.toString();
-  }
-
-  /**
-   * Ensure sets are properly sorted by orderPosition
-   */
   private ensureSortedSets(workout: WorkoutHistory): void {
   if (!workout.exerciseHistories) return;
   
@@ -532,12 +363,10 @@ export class ProfilePage implements OnInit, OnDestroy {
   
   workout.exerciseHistories.forEach(exercise => {
     if (exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0) {
-      // Sort the sets
       const sortedSets = [...exercise.exerciseSetHistories].sort(
         (a, b) => (a.orderPosition || 0) - (b.orderPosition || 0)
       );
       
-      // Create a brand new array to trigger change detection
       exercise.exerciseSetHistories = sortedSets;
       changed = true;
       
@@ -548,7 +377,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   });
   
-  // Force change detection
   if (changed) {
       setTimeout(() => {
         console.log('Forcing change detection after sort');
@@ -556,4 +384,54 @@ export class ProfilePage implements OnInit, OnDestroy {
       }, 0);
     }
   }
+
+  // Add missing methods
+  formatDuration(duration: string | undefined): string {
+    if (!duration) return '';
+    
+    // Clean up PT format to display minutes and seconds
+    return duration
+      .replace('PT', '')
+      .replace('H', 'h ')
+      .replace('M', 'm ')
+      .replace('S', 's');
+  }
+  
+  handleImageError(event: Event): void {
+    const imgElement = event.target as HTMLImageElement;
+    if (imgElement) {
+      imgElement.src = 'assets/logo/athletiq-logo.jpeg';
+    }
+  }
+  
+  getSetTypeClass(type: string | undefined): string {
+    if (!type) return '';
+    
+    switch(type) {
+      case 'WARMUP': return 'warmup-set';
+      case 'DROPSET': return 'dropset-set';
+      case 'FAILURE': return 'failure-set';
+      default: return '';
+    }
+  }
+  
+  getSetDisplay(set: any, exercise: any): string {
+    if (!set || !set.type) return '1';
+    
+    if (set.type === 'NORMAL') {
+      // Count normal sets
+      const normalSets = (exercise.exerciseSetHistories || [])
+        .filter((s: any) => s.type === 'NORMAL' && s.orderPosition <= set.orderPosition)
+        .length;
+      return normalSets.toString();
+    }
+    
+    switch(set.type) {
+      case 'WARMUP': return 'W';
+      case 'DROPSET': return 'D';
+      case 'FAILURE': return 'F';
+      default: return '1';
+    }
+  }
+  
 }
