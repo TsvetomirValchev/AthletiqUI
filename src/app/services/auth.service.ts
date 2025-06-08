@@ -44,8 +44,6 @@ export class AuthService {
           const userData = JSON.parse(userDataStr);
           this.currentUserSubject.next(userData);
         }
-        
-        this.validateToken().subscribe();
       } catch (e) {
         console.error('Error parsing stored data', e);
       }
@@ -114,46 +112,6 @@ export class AuthService {
     );
   }
 
-  validateToken(): Observable<boolean> {
-    const headers = {
-      'Authorization': `Bearer ${this.accessToken}`,
-      'X-Client-Type': this.storage.isMobile() ? 'mobile' : 'web'
-    };
-
-    return this.http.get(`${this.apiUrl}/validate-token`, { 
-      headers,
-      responseType: 'text'
-    }).pipe(
-      map(token => {
-        if (token) {
-          this.accessToken = token;
-          this.saveTokenBasedOnPlatform(token);
-          
-          const decodedToken = this.decodeToken(token);
-          const userData = {
-            userId: decodedToken?.userId,
-            username: decodedToken?.username,
-            email: decodedToken?.email || ''
-          };
-          
-          this.saveUserData(userData);
-          this.currentUserSubject.next(userData);
-          
-          this.setupTokenRefresh(token);
-          return true;
-        }
-        return false;
-      }),
-      catchError(error => {
-        console.error('Token validation error:', error);
-        if (!this.storage.isMobile()) {
-          this.logout();
-        }
-        return of(false);
-      })
-    );
-  }
-
   private decodeToken(token: string): DecodedToken | null {
     try {
       const payload = token.split('.')[1];
@@ -193,7 +151,6 @@ export class AuthService {
         this.saveUserData(userData);
         this.currentUserSubject.next(userData);
 
-        this.setupTokenRefresh(token);
       })
     );
   }
@@ -286,47 +243,6 @@ export class AuthService {
     expirationDate.setUTCSeconds(decodedToken.exp);
     
     return expirationDate.valueOf() <= new Date().valueOf();
-  }
-
-  private setupTokenRefresh(token: string): void {
-    if (this.tokenRefreshTimeout) {
-      clearTimeout(this.tokenRefreshTimeout);
-    }
-    
-    if (!this.storage.isMobile()) {
-      const decodedToken = this.decodeToken(token);
-      if (!decodedToken?.exp) return;
-      
-      const expirationDate = new Date(0);
-      expirationDate.setUTCSeconds(decodedToken.exp);
-      
-      const timeUntilExpiry = expirationDate.valueOf() - new Date().valueOf();
-      
-      const refreshTime = Math.max(timeUntilExpiry * 0.8, 60000);
-      
-      console.log(`Token will be refreshed in ${Math.round(refreshTime / 60000)} minutes`);
-      
-      this.tokenRefreshTimeout = setTimeout(() => {
-        console.log('Auto-refreshing token before expiration');
-        this.validateToken().subscribe({
-          next: () => console.log('Token refreshed successfully'),
-          error: (err) => console.error('Failed to refresh token', err)
-        });
-      }, refreshTime);
-    }
-  }
-
-  checkAndRefreshTokenIfNeeded(): Observable<boolean> {
-    if (!this.accessToken) {
-      return of(false);
-    }
-    
-    if (this.isTokenAboutToExpire()) {
-      console.log('Token is about to expire, refreshing...');
-      return this.validateToken();
-    }
-    
-    return of(true);
   }
 
   isTokenAboutToExpire(minuteThreshold: number = 5): boolean {

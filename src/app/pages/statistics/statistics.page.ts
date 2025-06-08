@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { catchError, finalize, forkJoin, of, take } from 'rxjs';
+import { catchError, finalize, forkJoin, of, switchMap, take } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { WorkoutStreakData } from '../../models/workout-streak-data.model';
 import { WorkoutStats } from '../../models/workout-stats.model';
@@ -72,7 +72,17 @@ export class StatisticsPage implements OnInit {
 
     this.authService.currentUser$.pipe(take(1)).subscribe(user => {
       if (!user || !user.userId) {
-        this.authService.validateToken().pipe(take(1)).subscribe(valid => {
+        this.authService.currentUser$.pipe(
+          take(1),
+          switchMap(user => {
+            if (user && user.userId) {
+              return of(true);
+            } else {
+              const token = this.authService.getToken();
+              return of(!!token);
+            }
+          })
+        ).subscribe(valid => {
           if (valid) {
             this.authService.currentUser$.pipe(take(1)).subscribe(validatedUser => {
               if (validatedUser && validatedUser.userId) {

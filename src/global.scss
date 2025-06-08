@@ -37,24 +37,329 @@
 @import "@ionic/angular/css/palettes/dark.system.css";
 
 /* Calendar size reduction */
-ion-datetime {
-  --ion-color-primary: var(--ion-color-primary);
-  max-width: 350px;
-  margin: auto;
-  
-  /* Make the calendar controls smaller */
-  --ion-datetime-calendar-height: 300px;
-  --ion-datetime-calendar-day-padding: 4px;
+
+/* Common utility classes */
+
+/* Common color utilities */
+.bg-card {
+  background-color: var(--card-background, #1e1e1e);
 }
 
-/* Make month/year header smaller */
-ion-datetime .datetime-header {
-  padding: 10px;
+.bg-input {
+  background-color: var(--input-background, #252525);
+}
+
+.text-secondary {
+  color: var(--text-secondary, #aaaaaa);
+}
+
+.warmup-set {
+  background-color: var(--warmup-set-bg);
+  
+  .set-cell {
+    color: var(--warmup-set-color);
+    font-weight: bold;
+  }
+}
+
+.dropset-set {
+  background-color: var(--dropset-set-bg);
+  
+  .set-cell {
+    color: var(--dropset-set-color);
+    font-weight: bold;
+  }
+}
+
+.failure-set {
+  background-color: var(--failure-set-bg);
+  
+  .set-cell {
+    color: var(--failure-set-color);
+    font-weight: bold;
+  }
+}
+
+.normal-type { color: var(--text-primary, white); }
+.warmup-type { color: var(--warmup-set-color); }
+.dropset-type { color: var(--dropset-set-color); }
+.failure-type { color: var(--failure-set-color); }
+
+/* Common Component Styling */
+
+// Headers and titles
+.section-title {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-primary, white);
+}
+
+.section-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary, #aaa);
+  margin-bottom: 16px;
+}
+
+.section-label {
+  color: var(--text-secondary, #aaa);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+// Avatar styling
+.exercise-avatar {
+  width: var(--avatar-size, 40px);
+  height: var(--avatar-size, 40px);
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 12px;
+  background: #333;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.exercise-avatar-small {
+  width: var(--avatar-small-size, 32px);
+  height: var(--avatar-small-size, 32px);
+}
+
+// Text input styling
+.standard-input {
+  background-color: var(--input-background, #252525);
+  border: none;
+  border-radius: var(--input-radius, 5px);
+  color: var(--text-primary, white);
+  padding: 12px;
+  width: 100%;
+  
+  &::placeholder {
+    color: #666;
+    opacity: 1;
+  }
+}
+
+.note-input {
+  @extend .standard-input;
+  min-height: 60px;
+  resize: none;
   font-size: 14px;
 }
 
-/* Make day cells smaller */
-ion-datetime .calendar-day {
-  font-size: 12px;
-  padding: 2px;
+// Set type styling
+.warmup-type, .warmup-set {
+  background-color: var(--warmup-set-bg);
+  
+  .set-cell {
+    color: var(--warmup-set-color);
+    font-weight: bold;
+  }
 }
+
+.dropset-type, .dropset-set {
+  background-color: var(--dropset-set-bg);
+  
+  .set-cell {
+    color: var(--dropset-set-color);
+    font-weight: bold;
+  }
+}
+
+.failure-type, .failure-set {
+  background-color: var(--failure-set-bg);
+  
+  .set-cell {
+    color: var(--failure-set-color);
+    font-weight: bold;
+  }
+}
+
+// Button styles
+.primary-button {
+  background-color: var(--button-primary, #007bff);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  ion-icon {
+    margin-right: 8px;
+  }
+  
+  &:disabled {
+    opacity: 0.7;
+    background-color: #505050;
+    color: #aaaaaa;
+    cursor: not-allowed;
+  }
+}
+
+.danger-button {
+  background-color: transparent;
+  color: var(--button-danger, #ff3b30);
+  border: 1px solid var(--button-danger, #ff3b30);
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  ion-icon {
+    margin-right: 8px;
+  }
+}
+
+// Card styling
+.standard-card {
+  background-color: var(--card-background, #1e1e1e);
+  border-radius: var(--card-radius, 10px);
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Set Type Selector Styling */
+.set-type-select {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background-color: var(--card-background, #1e1e1e);
+  color: var(--text-primary, white);
+  text-align: center;
+  
+  @media (min-width: 769px) {
+    border: 1px solid var(--input-border-color, #444);
+  }
+  
+  &::part(icon) {
+    display: none;
+  }
+  
+  &::part(text) {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    
+    // Force only the first character to be visible when collapsed
+    max-width: 15px;
+    text-overflow: clip;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  
+  &.warmup-type { color: var(--warmup-set-color, #ffa726); }
+  &.dropset-type { color: var(--dropset-set-color, #7e57c2); }
+  &.failure-type { color: var(--failure-set-color, #ef5350); }
+  &.normal-type { color: var(--text-primary, white); }
+}
+
+/* Popover Styling */
+::ng-deep .set-type-popover ion-select-option {
+  white-space: nowrap;
+  width: 100%;
+  display: block;
+}
+
+::ng-deep .select-interface-popover {
+  --width: 200px;
+  
+  .select-interface-option {
+    --padding-start: 10px;
+    --padding-end: 10px;
+    font-size: 14px;
+    
+    &.normal-type { color: var(--text-primary, white); }
+    &.warmup-type { color: var(--warmup-set-color, #ffa726); }
+    &.dropset-type { color: var(--dropset-set-color, #7e57c2); }
+    &.failure-type { color: var(--failure-set-color, #ef5350); }
+  }
+}
+
+/* Common Button Styles */
+
+// Remove button
+.remove-button {
+  background: none;
+  border: none;
+  color: var(--button-danger, red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
+}
+
+// Add set button
+.add-set-button {
+  background-color: transparent;
+  color: var(--button-primary, #0086ff);
+  padding: 8px;
+  width: 100%;
+  text-align: center;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  
+  @media (min-width: 769px) {
+    border: 1px solid var(--input-border-color, #444);
+    border-radius: 4px;
+  }
+  
+  ion-icon {
+    margin-right: 8px;
+  }
+}
+
+// Add exercise button
+.add-exercise-button-container {
+  margin-top: 16px;
+  padding: 0 16px 16px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.add-exercise-button {
+  background-color: var(--button-primary, #007bff);
+  color: var(--text-primary, white);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  cursor: pointer;
+  
+  ion-icon {
+    margin-right: 8px;
+    font-size: 20px;
+  }
+}
+

@@ -1,2 +1,37 @@
 // For information on how to create your own theme, please see:
 // http://ionicframework.com/docs/theming/
+
+// First: Define all your CSS variables in the :root selector
+:root {
+  // Ionic default variables
+  // ...existing variables...
+
+  // Colors
+  --app-background: #121212;
+  --card-background: #1e1e1e;
+  --input-background: #252525;
+  --border-color: #333;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --input-border-color: #444;
+  
+  // Buttons
+  --button-primary: #007bff;
+  --button-danger: #ff3b30;
+  --button-success: #28a745;
+  --button-warning: #ffc107;
+  
+  // Set types
+  --warmup-set-bg: rgba(255, 167, 38, 0.1);
+  --warmup-set-color: #ffa726;
+  --dropset-set-bg: rgba(126, 87, 194, 0.1);
+  --dropset-set-color: #7e57c2;
+  --failure-set-bg: rgba(239, 83, 80, 0.1);
+  --failure-set-color: #ef5350;
+  
+  // Common sizing
+  --avatar-size: 40px;
+  --avatar-small-size: 32px;
+  --card-radius: 10px;
+  --input-radius: 5px;
+}

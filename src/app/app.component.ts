@@ -52,8 +52,6 @@ export class AppComponent implements OnInit {
           this.activeWorkoutService.saveCurrentSession();
         }
       });
-      
-      // App is ready to use
     });
   }
 }

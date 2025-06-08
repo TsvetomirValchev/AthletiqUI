@@ -86,24 +86,21 @@ export class ProfilePage implements OnInit, OnDestroy {
           
           return this.profileService.getWorkoutStats();
         } else {
-          return this.authService.validateToken().pipe(
-            switchMap(valid => {
-              if (valid) {
-                return this.authService.currentUser$.pipe(
-                  switchMap(refreshedUser => {
-                    if (refreshedUser && refreshedUser.userId) {
-                      this.userId = refreshedUser.userId;
-                      this.username = refreshedUser.username || 'Athlete';
-                      return this.profileService.getWorkoutStats();
-                    }
-                    return of(null);
-                  })
-                );
-              }
-              console.error('No valid authentication found');
-              return of(null);
-            })
-          );
+          const token = this.authService.getToken();
+          if (token) {
+            return this.authService.currentUser$.pipe(
+              switchMap(refreshedUser => {
+                if (refreshedUser && refreshedUser.userId) {
+                  this.userId = refreshedUser.userId;
+                  this.username = refreshedUser.username || 'Athlete';
+                  return this.profileService.getWorkoutStats();
+                }
+                return of(null);
+              })
+            );
+          }
+          console.error('No valid authentication found');
+          return of(null);
         }
       })
     ).subscribe({

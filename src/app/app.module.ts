@@ -7,7 +7,6 @@ import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
-import { TokenRefreshInterceptor } from './interceptors/token-refresh.interceptor';
 
 @NgModule({
   declarations: [],
@@ -20,7 +19,6 @@ import { TokenRefreshInterceptor } from './interceptors/token-refresh.intercepto
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
-    { provide: HTTP_INTERCEPTORS, useClass: TokenRefreshInterceptor, multi: true }
   ],
   bootstrap: [AppComponent]
 })
