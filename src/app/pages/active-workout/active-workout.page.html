@@ -1,12 +1,11 @@
-<ion-header>
-  <ion-toolbar>
+<ion-header class="notch-friendly-header">
+  <ion-toolbar class="safe-area-toolbar">
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
     </ion-buttons>
-    <ion-title>
+    <ion-title class="ion-text-center">
       {{ workout?.name || 'Active Workout' }}
     </ion-title>
-    <div class="timer-display-header">{{ elapsedTime | time:'elapsed' }}</div>
     <ion-buttons slot="end">
       <ion-button (click)="finishWorkout()">
         <ion-icon name="checkmark-done-outline" slot="icon-only"></ion-icon>
@@ -17,6 +16,7 @@
 
 <ion-content class="create-routine-page">
   <div class="timer-controls-container">
+    <div class="timer-display">{{ elapsedTime | time:'elapsed' }}</div>
     <div class="timer-controls">
       <ion-button *ngIf="!isPaused" (click)="pauseWorkout()" color="warning">
         <ion-icon name="pause"></ion-icon>

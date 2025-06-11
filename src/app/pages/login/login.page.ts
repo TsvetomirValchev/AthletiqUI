@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { Router } from '@angular/router';
-import { AlertController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 
 @Component({
   selector: 'app-login',
@@ -18,11 +18,12 @@ export class LoginPage implements OnInit {
     private formBuilder: FormBuilder,
     private authService: AuthService,
     private router: Router,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private toastController: ToastController
   ) {
     this.loginForm = this.formBuilder.group({
-      username: ['', [Validators.required]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
+      username: ['', [Validators.required, Validators.minLength(3)]],
+      password: ['', [Validators.required, Validators.minLength(8)]],
     });
   }
 
@@ -49,25 +50,50 @@ export class LoginPage implements OnInit {
           
           if (error.status === 0) {
             errorMessage = 'Cannot connect to the server. Please check your internet connection or try again later.';
+            this.presentAlert('Connection Error', errorMessage);
           } else if (error.status === 401) {
             errorMessage = 'Invalid username or password.';
-          } else if (error.status === 403) {
-            errorMessage = 'Account is locked or disabled.';
+            this.presentToast(errorMessage, 'danger');
+            this.loginForm.get('password')?.reset();
+            this.loginForm.get('password')?.setErrors({ invalidCredentials: true });
+          } else {
+            this.presentToast(errorMessage, 'danger');
           }
-          
-          const alert = await this.alertController.create({
-            header: 'Login Error',
-            message: errorMessage,
-            buttons: ['OK']
-          });
-          
-          await alert.present();
         }
       });
     } else {
       console.log('Form is invalid');
       this.markFormGroupTouched(this.loginForm);
+      this.presentToast('Please enter valid credentials', 'warning');
     }
+  }
+  
+  async presentToast(message: string, color: 'danger' | 'warning' = 'danger') {
+    const toast = await this.toastController.create({
+      message: message,
+      duration: 2000,
+      position: 'bottom',
+      color: color,
+      cssClass: 'login-toast',
+      buttons: [
+        {
+          icon: 'close',
+          role: 'cancel'
+        }
+      ]
+    });
+    
+    await toast.present();
+  }
+  
+  async presentAlert(header: string, message: string) {
+    const alert = await this.alertController.create({
+      header: header,
+      message: message,
+      buttons: ['OK']
+    });
+    
+    await alert.present();
   }
   
   markFormGroupTouched(formGroup: FormGroup) {

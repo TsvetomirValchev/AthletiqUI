@@ -1,54 +1,55 @@
-<ion-header>
+<ion-header class="notch-friendly-header">
   <ion-toolbar>
-    <ion-title>Register</ion-title>
+    <ion-title>Create Account</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <form [formGroup]="registerForm">
-    <ion-grid>
-      <ion-row>
-        <ion-col size="12">
-          <ion-item>
-            <ion-label position="stacked">Email</ion-label>
-            <ion-input type="email" formControlName="email" placeholder="email@domain.com"></ion-input>
-          </ion-item>
-        </ion-col>
-      </ion-row>
+  <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
+    <ion-item>
+      <ion-label position="floating">Username</ion-label>
+      <ion-input formControlName="username" type="text"></ion-input>
+    </ion-item>
+    <ion-text color="danger" class="error-message" *ngIf="registerForm.get('username')?.touched && registerForm.get('username')?.errors">
+      <span *ngIf="registerForm.get('username')?.errors?.['required']">Username is required</span>
+      <span *ngIf="registerForm.get('username')?.errors?.['serverError']">
+        {{ registerForm.get('username')?.errors?.['serverError'] }}
+      </span>
+    </ion-text>
 
-      <ion-row>
-        <ion-col size="12">
-          <ion-item>
-            <ion-label position="stacked">Username</ion-label>
-            <ion-input type="text" formControlName="username" placeholder="username"></ion-input>
-          </ion-item>
-        </ion-col>
-      </ion-row>
+    <ion-item>
+      <ion-label position="floating">Email</ion-label>
+      <ion-input formControlName="email" type="email"></ion-input>
+    </ion-item>
+    <ion-text color="danger" class="error-message" *ngIf="registerForm.get('email')?.touched && registerForm.get('email')?.errors">
+      <span *ngIf="registerForm.get('email')?.errors?.['required']">Email is required</span>
+      <span *ngIf="registerForm.get('email')?.errors?.['email']">Please enter a valid email address</span>
+      <span *ngIf="registerForm.get('email')?.errors?.['serverError']">
+        {{ registerForm.get('email')?.errors?.['serverError'] }}
+      </span>
+    </ion-text>
 
-      <ion-row>
-        <ion-col size="12">
-          <ion-item>
-            <ion-label position="stacked">Password</ion-label>
-            <ion-input type="password" formControlName="password" placeholder="minimum 8 characters">
-            <ion-input-password-toggle slot="end"></ion-input-password-toggle>
-            </ion-input>
-          </ion-item>
-        </ion-col>
-      </ion-row>
+    <ion-item>
+      <ion-label position="floating">Password</ion-label>
+      <ion-input formControlName="password" type="password"></ion-input>
+    </ion-item>
+    <ion-text color="danger" class="error-message" *ngIf="registerForm.get('password')?.touched && registerForm.get('password')?.errors">
+      <span *ngIf="registerForm.get('password')?.errors?.['required']">Password is required</span>
+      <span *ngIf="registerForm.get('password')?.errors?.['minlength']">
+        Password must be at least 8 characters long
+      </span>
+      <span *ngIf="registerForm.get('password')?.errors?.['serverError']">
+        {{ registerForm.get('password')?.errors?.['serverError'] }}
+      </span>
+    </ion-text>
 
-      <ion-row>
-        <ion-col size="12">
-          <ion-button expand="block" color="primary" (click)="onRegister()">Register</ion-button>
-        </ion-col>
-      </ion-row>
-
-      <ion-row>
-        <ion-col size="12" class="ion-text-center">
-          <div class="login-link">
-            Already have an account? <a routerLink="/login">Login</a>
-          </div>
-        </ion-col>
-      </ion-row>
-    </ion-grid>
+    <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="isLoading">
+      <ion-spinner *ngIf="isLoading"></ion-spinner>
+      <span *ngIf="!isLoading">Register</span>
+    </ion-button>
   </form>
+
+  <div class="ion-text-center ion-margin-top">
+    <p>Already have an account? <a routerLink="/login">Log In</a></p>
+  </div>
 </ion-content>

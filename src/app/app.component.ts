@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { App } from '@capacitor/app';
 import { Platform, IonicModule } from '@ionic/angular';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ActiveWorkoutService } from './services/active-workout.service';
 
 @Component({
@@ -16,7 +16,8 @@ import { ActiveWorkoutService } from './services/active-workout.service';
 export class AppComponent implements OnInit {
   constructor(
     private platform: Platform,
-    private activeWorkoutService: ActiveWorkoutService
+    private activeWorkoutService: ActiveWorkoutService,
+    private router: Router
   ) {
     this.initializeApp();
   }
@@ -43,10 +44,24 @@ export class AppComponent implements OnInit {
         console.error('Error loading session:', error);
       }
     });
+
+    App.addListener('appUrlOpen', (data: { url: string }) => {
+      // Example URL: athletiq://reset-password?token=TOKEN
+      const url = new URL(data.url);
+      
+      if (url.pathname === '/reset-password') {
+        const token = url.searchParams.get('token');
+        this.router.navigate(['/reset-password'], { queryParams: { token } });
+      }
+    });
   }
 
   initializeApp() {
     this.platform.ready().then(() => {
+      if ((window as any).AndroidWebView) {
+        (window as any).AndroidWebView.setWebContentsDebuggingEnabled(true);
+      }
+
       App.addListener('appStateChange', ({ isActive }) => {
         if (!isActive) {
           this.activeWorkoutService.saveCurrentSession();

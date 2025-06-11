@@ -4,10 +4,8 @@ export interface ActiveWorkout extends Workout {
     workoutId?: string;
     description?: string;
     userId?: string;
-    createdAt?: string;
-    updatedAt?: string;
     startTime?: string;
     endTime?: string;
-    duration?: string;
+    duration?: number;
     elapsedTimeSeconds?: number;
 }

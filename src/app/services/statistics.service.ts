@@ -4,7 +4,7 @@ import { Observable, of } from 'rxjs';
 import { catchError, switchMap, retry } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-import { CalendarDayData } from '../models/calendar-day-data.model';
+import { CalendarDay } from '../models/calendar-day.model';
 import { WorkoutStreakData } from '../models/workout-streak-data.model';
 
 @Injectable({
@@ -49,7 +49,7 @@ export class StatisticsService {
     );
   }
 
-  getCalendarData(year: number, month: number): Observable<CalendarDayData[]> {
+  getCalendarData(year: number, month: number): Observable<CalendarDay[]> {
     return this.authService.currentUser$.pipe(
       switchMap(user => {
         if (!user || !user.userId) {
@@ -60,7 +60,7 @@ export class StatisticsService {
         const params = new HttpParams().set('userId', user.userId);
         console.log(`Requesting calendar data for ${year}/${month} with userId: ${user.userId}`);
         
-        return this.http.get<CalendarDayData[]>(`${this.apiUrl}/calendar/${year}/${month}`, { params }).pipe(
+        return this.http.get<CalendarDay[]>(`${this.apiUrl}/calendar/${year}/${month}`, { params }).pipe(
           retry(this.maxRetries),
           catchError(error => {
             console.error('Error fetching calendar data:', error);

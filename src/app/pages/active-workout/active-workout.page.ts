@@ -470,12 +470,9 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
         exercise => !exercise.exerciseId || exercise.exerciseId.toString().startsWith('temp-')
       );
       
-      const timerValue = this.elapsedTime;
-      const duration = this.timePipe.transform(timerValue, 'duration')
-      
       const workoutWithDuration: ActiveWorkout = {
         ...currentSession.workout,
-        duration: duration,
+        duration: this.elapsedTime,
         endTime: new Date().toISOString()
       };
       

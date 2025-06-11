@@ -11,17 +11,9 @@ import { IndexedDBService } from './indexed-db.service';
 import { Subscription, interval } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
 import { SetType } from '../models/set-type.enum';
+import { WorkoutSession } from '../models/workout-session.model';
 
-// Define the WorkoutSession interface
-interface WorkoutSession {
-  workout: Workout;
-  exercises: Exercise[];
-  startTime: string;
-  elapsedTimeSeconds: number;
-  isPaused: boolean;
-  lastPausedAt?: number;
-  totalPausedSeconds: number;
-}
+
 
 @Injectable({
   providedIn: 'root'

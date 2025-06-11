@@ -127,12 +127,20 @@ export class AuthService {
     const headers = {
       'X-Client-Type': this.storage.isMobile() ? 'mobile' : 'web'
     };
-    return this.http.post(`${this.apiUrl}/login`, { 
+    
+    return this.http.post<{token: string}>(`${this.apiUrl}/login`, { 
       usernameOrEmail: usernameOrEmail,
       password 
-    }, { headers, responseType: "text" })
+    }, { headers })
     .pipe(
-      tap(token => {
+      map(response => {
+        // Extract the token from the new response format
+        const token = response.token;
+        
+        if (!token) {
+          throw new Error('No token received from server');
+        }
+        
         this.accessToken = token;
         
         const decodedToken = this.decodeToken(token);
@@ -150,7 +158,15 @@ export class AuthService {
         };
         this.saveUserData(userData);
         this.currentUserSubject.next(userData);
-
+        
+        // Return the token to the component
+        return token;
+      }),
+      catchError(error => {
+        // Don't handle errors here - let the component handle them
+        // This ensures 401 and other errors reach the component's error handler
+        console.error('Login error in service:', error);
+        return throwError(() => error);
       })
     );
   }

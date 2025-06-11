@@ -8,7 +8,7 @@ import { catchError, finalize, forkJoin, of, switchMap, take } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { WorkoutStreakData } from '../../models/workout-streak-data.model';
 import { WorkoutStats } from '../../models/workout-stats.model';
-import { CalendarDayData } from '../../models/calendar-day-data.model';
+import { CalendarDay } from '../../models/calendar-day.model';
 import { AuthService } from '../../services/auth.service';
 import { MuscleGroupChartComponent } from '../../components/muscle-group-chart/muscle-group-chart.component';
 
@@ -51,7 +51,7 @@ export class StatisticsPage implements OnInit {
   };
   daysSinceLastWorkout = 0;
   
-  private apiUrl = environment.apiUrl || 'http://localhost:6969';
+  private apiUrl = environment.apiUrl;
 
   constructor(
     private http: HttpClient,
@@ -114,10 +114,10 @@ export class StatisticsPage implements OnInit {
         catchError(this.handleError<WorkoutStreakData>('workout streaks', 
           { currentStreak: 0, longestStreak: 0, lastWorkoutDate: '', workoutDates: [] }))
       ),
-      calendarData: this.http.get<CalendarDayData[]>(
+      calendarData: this.http.get<CalendarDay[]>(
         `${this.apiUrl}/statistics/calendar/${year}/${monthStr}?userId=${userId}`
       ).pipe(
-        catchError(this.handleError<CalendarDayData[]>('calendar data', []))
+        catchError(this.handleError<CalendarDay[]>('calendar data', []))
       )
     };
 
@@ -154,7 +154,7 @@ export class StatisticsPage implements OnInit {
     this.isLoading = false;
   }
 
-  processCalendarData(calendarData: CalendarDayData[]) {
+  processCalendarData(calendarData: CalendarDay[]) {
     this.workoutDates.clear();
     
     calendarData.forEach(day => {

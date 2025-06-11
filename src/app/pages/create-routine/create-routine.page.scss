@@ -239,6 +239,13 @@ ion-input {
   align-items: center;
   padding: 16px;
   border-bottom: 1px solid var(--border-color, #333);
+  
+  .done-button {
+    // Hide on desktop screens
+    @media (min-width: 769px) {
+      display: none;
+    }
+  }
 }
 
 .library-title {
@@ -496,5 +503,11 @@ ion-input {
       color: var(--text-primary, white);
       margin-bottom: 0;
     }
+  }
+}
+
+.library-footer {
+  @media (min-width: 769px) {
+    display: none !important;
   }
 }
