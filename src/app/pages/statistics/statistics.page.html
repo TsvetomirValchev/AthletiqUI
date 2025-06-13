@@ -1,3 +1,13 @@
+<ion-header class="notch-friendly-header">
+  <ion-toolbar>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/settings">
+        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
 <ion-content>
   <div *ngIf="isLoading" class="loading-container">
     <ion-spinner name="crescent"></ion-spinner>
@@ -79,6 +89,7 @@
       </ion-card-content>
     </ion-card>
 
+    <!-- Muscle Group Focus Chart Card -->
     <ion-card>
       <ion-card-header>
         <ion-card-title>Muscle Group Focus</ion-card-title>
