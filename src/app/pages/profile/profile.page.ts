@@ -382,12 +382,9 @@ export class ProfilePage implements OnInit, OnDestroy {
     }
   }
 
-  // Add missing methods
   formatDuration(duration: string | undefined): string {
     if (!duration) return '';
-    
-    // Clean up PT format to display minutes and seconds
-    return duration
+      return duration
       .replace('PT', '')
       .replace('H', 'h ')
       .replace('M', 'm ')
@@ -416,7 +413,6 @@ export class ProfilePage implements OnInit, OnDestroy {
     if (!set || !set.type) return '1';
     
     if (set.type === 'NORMAL') {
-      // Count normal sets
       const normalSets = (exercise.exerciseSetHistories || [])
         .filter((s: any) => s.type === 'NORMAL' && s.orderPosition <= set.orderPosition)
         .length;

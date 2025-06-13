@@ -1,16 +1,4 @@
-<ion-header class="notch-friendly-header">
-  <ion-toolbar>
-    <ion-title class="ion-text-center">Profile</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/settings">
-        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content>
-  <!-- User Profile Stats -->
   <div class="user-profile-header">
     <h1>{{ username }}</h1>
     <div class="profile-stats">
@@ -64,9 +52,7 @@
             </div>
           </div>
           
-          <!-- Detailed Exercise List - Visible only when expanded -->
           <div *ngIf="expandedWorkoutIndex === i" class="exercises-list">
-            <!-- Loading indicator while fetching details -->
             <div *ngIf="loadingDetails" class="details-loading">
               <ion-spinner name="crescent"></ion-spinner>
               <p>Loading details...</p>
@@ -89,9 +75,8 @@
                   <span class="sets-count">{{ exercise.exerciseSetHistories?.length || 0 }} sets</span>
                   <ion-icon [name]="exerciseVisibilityMap.get(getExerciseKey(exercise)) ? 'chevron-up' : 'chevron-down'" class="toggle-sets-icon"></ion-icon>
                 </div>
-              </div>              <!-- Sets table - collapsible -->
+              </div>            
               <div class="sets-table" *ngIf="exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0">
-                <!-- Header row -->
                 <div class="sets-header">
                   <div class="set-cell">Set</div>
                   <div class="weight-cell">Weight</div>
@@ -99,7 +84,6 @@
                   <div class="status-cell">Status</div>
                 </div>
                 
-                <!-- Set rows -->
                 <div *ngFor="let set of exercise.exerciseSetHistories; let i = index" class="set-row" 
                      [ngClass]="getSetTypeClass(set.type)">
                   <div class="set-cell">{{ getSetDisplay(set, exercise) }}</div>

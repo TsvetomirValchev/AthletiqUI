@@ -1,7 +1,6 @@
 import { Exercise } from "./exercise.model";
 import { Workout } from "./workout.model";
 
-// Define the WorkoutSession interface
 export interface WorkoutSession {
   workout: Workout;
   exercises: Exercise[];

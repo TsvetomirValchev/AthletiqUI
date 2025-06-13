@@ -1,47 +1,20 @@
-<ion-header class="notch-friendly-header">
-  <ion-toolbar>
-    <ion-title>Create Account</ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content class="ion-padding">
   <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
     <ion-item>
       <ion-label position="floating">Username</ion-label>
       <ion-input formControlName="username" type="text"></ion-input>
     </ion-item>
-    <ion-text color="danger" class="error-message" *ngIf="registerForm.get('username')?.touched && registerForm.get('username')?.errors">
-      <span *ngIf="registerForm.get('username')?.errors?.['required']">Username is required</span>
-      <span *ngIf="registerForm.get('username')?.errors?.['serverError']">
-        {{ registerForm.get('username')?.errors?.['serverError'] }}
-      </span>
-    </ion-text>
+
 
     <ion-item>
       <ion-label position="floating">Email</ion-label>
       <ion-input formControlName="email" type="email"></ion-input>
     </ion-item>
-    <ion-text color="danger" class="error-message" *ngIf="registerForm.get('email')?.touched && registerForm.get('email')?.errors">
-      <span *ngIf="registerForm.get('email')?.errors?.['required']">Email is required</span>
-      <span *ngIf="registerForm.get('email')?.errors?.['email']">Please enter a valid email address</span>
-      <span *ngIf="registerForm.get('email')?.errors?.['serverError']">
-        {{ registerForm.get('email')?.errors?.['serverError'] }}
-      </span>
-    </ion-text>
 
     <ion-item>
       <ion-label position="floating">Password</ion-label>
       <ion-input formControlName="password" type="password"></ion-input>
     </ion-item>
-    <ion-text color="danger" class="error-message" *ngIf="registerForm.get('password')?.touched && registerForm.get('password')?.errors">
-      <span *ngIf="registerForm.get('password')?.errors?.['required']">Password is required</span>
-      <span *ngIf="registerForm.get('password')?.errors?.['minlength']">
-        Password must be at least 8 characters long
-      </span>
-      <span *ngIf="registerForm.get('password')?.errors?.['serverError']">
-        {{ registerForm.get('password')?.errors?.['serverError'] }}
-      </span>
-    </ion-text>
 
     <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="isLoading">
       <ion-spinner *ngIf="isLoading"></ion-spinner>

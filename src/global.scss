@@ -295,9 +295,7 @@
   }
 }
 
-/* Common Button Styles */
 
-// Remove button
 .remove-button {
   background: none;
   border: none;
@@ -311,7 +309,6 @@
   font-size: 18px;
 }
 
-// Add set button
 .add-set-button {
   background-color: transparent;
   color: var(--button-primary, #0086ff);
@@ -334,7 +331,6 @@
   }
 }
 
-// Add exercise button
 .add-exercise-button-container {
   margin-top: 16px;
   padding: 0 16px 16px;
@@ -363,7 +359,6 @@
   }
 }
 
-// Safe area handling for all pages
 .notch-friendly-header {
   ion-toolbar {
     padding-top: var(--ion-safe-area-top, 0);

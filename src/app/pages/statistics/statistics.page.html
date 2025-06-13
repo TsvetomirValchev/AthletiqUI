@@ -1,22 +1,9 @@
-<ion-header class="notch-friendly-header">
-  <ion-toolbar>
-    <ion-title class="ion-text-center">Statistics</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/settings">
-        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content>
-  <!-- Loading indicator -->
   <div *ngIf="isLoading" class="loading-container">
     <ion-spinner name="crescent"></ion-spinner>
     <p>Loading statistics...</p>
   </div>
 
-  <!-- Error message -->
   <div *ngIf="error" class="error-container">
     <ion-icon name="warning-outline"></ion-icon>
     <p>{{ error }}</p>
@@ -25,9 +12,7 @@
     </ion-button>
   </div>
 
-  <!-- Statistics Content -->
   <div *ngIf="!isLoading" class="statistics-container">
-    <!-- Workout Streaks Card -->
     <ion-card>
       <ion-card-header>
         <ion-card-title>Workout Streaks</ion-card-title>
@@ -56,7 +41,6 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Custom Workout Calendar Card -->
     <ion-card>
       <ion-card-header>
         <div class="calendar-header">
@@ -70,16 +54,13 @@
         </div>
       </ion-card-header>
       <ion-card-content>
-        <!-- Custom Calendar Implementation -->
         <div class="custom-calendar">
-          <!-- Weekday Headers -->
           <div class="calendar-header-row">
             <div *ngFor="let day of weekDays" class="calendar-header-cell">
               {{ day }}
             </div>
           </div>
           
-          <!-- Calendar Grid -->
           <div class="calendar-grid">
             <div 
               *ngFor="let day of calendarDays"
@@ -98,7 +79,6 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Muscle Group Focus Chart Card -->
     <ion-card>
       <ion-card-header>
         <ion-card-title>Muscle Group Focus</ion-card-title>

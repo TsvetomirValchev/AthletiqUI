@@ -241,7 +241,6 @@ ion-input {
   border-bottom: 1px solid var(--border-color, #333);
   
   .done-button {
-    // Hide on desktop screens
     @media (min-width: 769px) {
       display: none;
     }

@@ -15,6 +15,7 @@ import { AlertController, ToastController } from '@ionic/angular';
 export class RegisterPage implements OnInit {
   registerForm: FormGroup;
   isLoading = false;
+  showValidationMessages = false;
 
   constructor(
     private formBuilder: FormBuilder,
@@ -32,7 +33,14 @@ export class RegisterPage implements OnInit {
 
   ngOnInit() {}
 
+  isFieldInvalid(fieldName: string): boolean {
+    const field = this.registerForm.get(fieldName);
+    return field ? field.invalid && this.showValidationMessages : false;
+  }
+
   onRegister() {
+    this.showValidationMessages = true;
+    
     if (this.registerForm.valid) {
       this.isLoading = true;
       const { username, email, password } = this.registerForm.value;
@@ -55,50 +63,39 @@ export class RegisterPage implements OnInit {
             return;
           }
           
-          // Handle validation errors from backend
           if (error.status === 400 && error.error) {
             this.handleValidationErrors(error.error);
           } else if (error.status === 409) {
-            // Conflict - username or email already exists
             this.presentToast('Username or email is already taken. Please try another.', 'danger');
           } else {
-            // Generic error
             this.presentToast('Registration failed. Please try again.', 'danger');
           }
         }
       });
     } else {
-      this.markFormGroupTouched(this.registerForm);
+      console.log('Form is invalid');
       this.showFormValidationErrors();
     }
   }
-  
-  /**
-   * Handle validation errors from backend and set appropriate form errors
-   */
+
   handleValidationErrors(errorResponse: any) {
-    // If response contains field-specific errors
     if (typeof errorResponse === 'object') {
       const fields = Object.keys(errorResponse);
       
-      // Handle each field error
       fields.forEach(field => {
         const control = this.registerForm.get(field);
         if (control) {
           const errorMsg = errorResponse[field];
           control.setErrors({ serverError: errorMsg });
           
-          // Show toast with error message
           this.presentToast(`${this.capitalizeField(field)}: ${errorMsg}`, 'danger');
         }
       });
       
-      // If no field-specific errors were found or handled
       if (fields.length === 0) {
         this.presentToast('Invalid registration data. Please check your information.', 'danger');
       }
     } else if (typeof errorResponse === 'string') {
-      // If error is a simple string message
       this.presentToast(errorResponse, 'danger');
     } else {
       // Generic error fallback
@@ -106,9 +103,6 @@ export class RegisterPage implements OnInit {
     }
   }
   
-  /**
-   * Show validation errors for client-side validation
-   */
   showFormValidationErrors() {
     const errors: string[] = [];
     
@@ -125,9 +119,8 @@ export class RegisterPage implements OnInit {
       }
     });
     
-    // Show toast with all validation errors
     if (errors.length > 0) {
-      this.presentToast(errors.join('<br>'), 'warning');
+      this.presentToast(errors.join(','), 'warning');
     }
   }
   

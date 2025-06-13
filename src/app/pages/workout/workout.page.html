@@ -1,21 +1,8 @@
-<ion-header class="notch-friendly-header">
-  <ion-toolbar>
-    <ion-title class="ion-text-center">Workout</ion-title>
-    <ion-buttons slot="end">
-      <ion-button routerLink="/settings">
-        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content class="dark-theme">
-  <!-- Add pull-to-refresh capability -->
   <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <!-- Routines Section -->
   <div class="section">
     <div class="routines-header">
       <div class="section-header">Routines</div>
@@ -33,7 +20,6 @@
       </ion-button>
     </div>
 
-    <!-- My Routines Section -->
     <div class="my-routines">
       <div class="my-routines-header">
         My Routines ({{workouts.length}})
@@ -44,12 +30,10 @@
         <ion-spinner></ion-spinner>
       </div>
 
-      <!-- No Routines Message -->
       <div *ngIf="!isLoading && workouts.length === 0" class="empty-state">
         <p>No saved routines yet</p>
       </div>
 
-      <!-- Routine Cards -->
       <div class="workout-cards">
         <div *ngFor="let workout of workouts" class="workout-card">
           <div class="workout-header">

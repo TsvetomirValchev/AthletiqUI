@@ -1,12 +1,3 @@
-<ion-header class="notch-friendly-header">
-  <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
-    </ion-buttons>
-    <ion-title>Browse Exercises</ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content>
   <ion-searchbar [(ngModel)]="searchTerm" (ionChange)="onSearch($event)" placeholder="Search exercises"></ion-searchbar>
 

@@ -7,7 +7,6 @@ export const authGuard: CanActivateFn = async (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
   
-  // Convert Observable to Promise
   const tokenStatus = await firstValueFrom(authService.checkTokenStatus());
   
   console.log('Auth Guard Check:', { 

@@ -1,6 +1,3 @@
-// Profile Page Styling
-
-// User profile header
 .user-profile-header {
   padding: 24px 16px;
   text-align: center;
@@ -17,7 +14,6 @@
   }
 }
 
-// Profile stats display
 .profile-stats {
   display: flex;
   justify-content: space-around;
@@ -38,7 +34,6 @@
   }
 }
 
-// Workout history container
 .workout-history-container {
   padding: 0 16px 24px;
   
@@ -56,7 +51,6 @@
   gap: 16px;
 }
 
-// Workout cards
 .workout-card {
   margin: 0 0 16px 0;
   border-radius: 12px;
@@ -85,7 +79,6 @@
   }
 }
 
-// Workout header content
 .workout-header-content {
   display: flex;
   justify-content: space-between;
@@ -109,7 +102,6 @@
   }
 }
 
-// Stats summary
 .stats-summary {
   display: flex;
   justify-content: space-around;
@@ -133,7 +125,6 @@
   }
 }
 
-// Exercise items
 .exercises-list {
   margin-top: 16px;
 }
@@ -179,12 +170,11 @@
   color: var(--ion-color-medium);
 }
 
-// Sets table
 .sets-table {
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
-  background-color: rgba(0, 0, 0, 0.05); // Darker background
+  background-color: rgba(0, 0, 0, 0.05);
   margin-top: 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -193,7 +183,7 @@
 .sets-header {
   display: grid;
   grid-template-columns: 1fr 2fr 2fr 1fr;
-  background-color: rgba(0, 0, 0, 0.1); // Even darker header
+  background-color: rgba(0, 0, 0, 0.1);
   padding: 12px 0;
   font-weight: 500;
   font-size: 14px;
@@ -213,7 +203,7 @@
   }
   
   &:hover {
-    background-color: rgba(var(--ion-color-primary-rgb), 0.05); // Highlight on hover with primary color
+    background-color: rgba(var(--ion-color-primary-rgb), 0.05);
   }
 }
 
@@ -223,7 +213,6 @@
   align-items: center;
 }
 
-// Status styling
 .status-cell {
   ion-icon {
     font-size: 18px;
@@ -238,7 +227,6 @@
   }
 }
 
-// Empty states and loading
 .no-exercises, .no-sets {
   text-align: center;
   padding: 16px;
@@ -298,7 +286,6 @@
   }
 }
 
-// Animation styles
 .rotate-icon {
   transform: rotate(180deg);
 }
@@ -307,7 +294,6 @@ ion-card-header.expanded {
   background-color: rgba(var(--ion-color-primary-rgb), 0.05);
 }
 
-// Exercise title with image
 .exercise-title-container {
   display: flex;
   align-items: center;
@@ -316,13 +302,12 @@ ion-card-header.expanded {
 
 .exercise-avatar {
   @extend .exercise-avatar;
-  border-radius: 6px; // Component-specific override
+  border-radius: 6px;
 }
 
-// Set type styling
 .warmup-type {
   .set-cell {
-    color: #ffa726; // Orange for warmup
+    color: #ffa726;
     font-weight: bold;
   }
   background-color: rgba(255, 167, 38, 0.1);
@@ -330,7 +315,7 @@ ion-card-header.expanded {
 
 .dropset-type {
   .set-cell {
-    color: #7e57c2; // Purple for dropset
+    color: #7e57c2;
     font-weight: bold;
   }
   background-color: rgba(126, 87, 194, 0.1);
@@ -338,7 +323,7 @@ ion-card-header.expanded {
 
 .failure-type {
   .set-cell {
-    color: #ef5350; // Red for failure
+    color: #ef5350;
     font-weight: bold;
   }
   background-color: rgba(239, 83, 80, 0.1);

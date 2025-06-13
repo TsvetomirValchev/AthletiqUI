@@ -25,17 +25,14 @@ export class AppComponent implements OnInit {
   ngOnInit() {
     console.log('App component initializing');
     
-    // Load any saved workout session
     this.activeWorkoutService.loadSavedSession().subscribe({
       next: hasSession => {
         console.log('Has active workout session:', hasSession);
         
-        // Force refresh of current workout stream
         if (hasSession) {
           const session = this.activeWorkoutService.getCurrentSession();
           if (session && session.workout) {
             console.log('Broadcasting active session to components', session.workout);
-            // Force a refresh of the currentSessionSubject to trigger subscribers
             this.activeWorkoutService['currentSessionSubject'].next({...session});
           }
         }
@@ -46,7 +43,6 @@ export class AppComponent implements OnInit {
     });
 
     App.addListener('appUrlOpen', (data: { url: string }) => {
-      // Example URL: athletiq://reset-password?token=TOKEN
       const url = new URL(data.url);
       
       if (url.pathname === '/reset-password') {

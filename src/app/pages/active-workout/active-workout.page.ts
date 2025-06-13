@@ -391,7 +391,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   addExerciseFromTemplate(template: ExerciseTemplate) {
     if (!template || !template.exerciseTemplateId || !this.workout?.workoutId) return;
     
-    // Ensure proper orderPosition
     const maxOrderPosition = this.exercises.reduce(
       (max, exercise) => Math.max(max, exercise.orderPosition || 0), 
       -1
@@ -402,7 +401,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       name: template.name,
       notes: '',
       workoutId: this.workout.workoutId,
-      orderPosition: maxOrderPosition + 1, // Always put at the end
+      orderPosition: maxOrderPosition + 1,
       sets: [
         {
           type: SetType.NORMAL,
@@ -419,7 +418,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     
     this.activeWorkoutService.addExerciseToWorkout(this.workout.workoutId, newExercise).subscribe({
       next: (updatedExercises: Exercise[]) => {
-        // Double check order positions on returned exercises
         this.exercises = updatedExercises.map((ex, i) => ({
           ...ex,
           orderPosition: ex.orderPosition !== undefined ? ex.orderPosition : i
