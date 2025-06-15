@@ -15,6 +15,9 @@ import { FormsModule } from '@angular/forms';
 })
 export class SettingsPage implements OnInit {
   darkMode = false;
+  appVersion = '1.0.0';
+  userEmail = '';
+  username = '';
   
   constructor(
     private alertController: AlertController,
@@ -24,6 +27,15 @@ export class SettingsPage implements OnInit {
 
   ngOnInit() {
  
+  }
+
+  ionViewWillEnter() {
+    this.authService.currentUser$.subscribe(user => {
+      if (user) {
+        this.userEmail = user.email || '';
+        this.username = user.username || '';
+      }
+    });
   }
 
   async resetPassword() {
@@ -111,6 +123,27 @@ export class SettingsPage implements OnInit {
           }
         }
       ]
+    });
+    
+    await alert.present();
+  }
+  
+  async openAbout() {
+    const alert = await this.alertController.create({
+      header: 'About Athletiq',
+      message: 'Athletiq is your personal workout companion. Track your progress, plan your workouts, and achieve your fitness goals.<br><br>© 2025 Athletiq',
+      buttons: ['Close']
+    });
+    
+    await alert.present();
+  }
+
+  
+  async showInfoModal(title: string, content: string) {
+    const alert = await this.alertController.create({
+      header: title,
+      message: content,
+      buttons: ['Close']
     });
     
     await alert.present();

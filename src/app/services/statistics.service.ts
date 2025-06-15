@@ -105,7 +105,6 @@ export class StatisticsService {
     const minutes = parseInt(matches[2] || '0', 10);
     const seconds = parseInt(matches[3] || '0', 10);
     
-    // Convert to minutes
     return hours * 60 + minutes + (seconds / 60);
   }
 }

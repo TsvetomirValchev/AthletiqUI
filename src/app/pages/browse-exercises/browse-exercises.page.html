@@ -3,6 +3,7 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
     </ion-buttons>
+    <ion-title>Browse Exercises</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -15,11 +16,15 @@
   </div>
 
   <ion-list *ngIf="!isLoading">
-    <ion-item *ngFor="let exercise of filteredTemplates" button detail (click)="viewExerciseDetails(exercise)">
+    <ion-item *ngFor="let exercise of filteredTemplates">
+      <div class="exercise-avatar" slot="start">
+        <img [src]="exercise.name | exerciseImage" (error)="onImageError($event)" alt="{{ exercise.name }}">
+      </div>
+      
       <ion-label>
         <h2>{{ exercise.name }}</h2>
         <p *ngIf="exercise.description">{{ exercise.description }}</p>
-        <p *ngIf="exercise.targetMuscleGroups?.length">
+        <p *ngIf="exercise.targetMuscleGroups?.length" class="muscle-groups">
           <span *ngFor="let muscle of exercise.targetMuscleGroups; let last = last">
             {{ muscle }}{{ !last ? ', ' : '' }}
           </span>

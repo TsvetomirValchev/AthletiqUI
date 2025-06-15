@@ -333,7 +333,21 @@ ion-checkbox.set-completion-checkbox {
     .close-button {
       --color: #aaa;
     }
+    
+    .exercise-image-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 50%;
+  
+    img {
+      position: relative;
+      top: 12px;
+      width: 110%;
+      height: 110%;
+      object-fit: cover;
+    }
   }
+}
   
   .search-bar {
     margin: 0 16px 16px;

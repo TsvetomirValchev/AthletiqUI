@@ -5,13 +5,14 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ExerciseTemplate } from '../../models/exercise-template.model';
 import { ExerciseTemplateService } from '../../services/exercise-template.service';
+import { ExerciseImagePipe } from '../../pipes/exercise-image.pipe';
 
 @Component({
   selector: 'app-browse-exercises',
   templateUrl: './browse-exercises.page.html',
   styleUrls: ['./browse-exercises.page.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule]
+  imports: [IonicModule, CommonModule, FormsModule, ExerciseImagePipe]
 })
 export class BrowseExercisesPage implements OnInit {
   exerciseTemplates: ExerciseTemplate[] = [];
@@ -40,6 +41,7 @@ export class BrowseExercisesPage implements OnInit {
       error: (error: Error) => {
         console.error('Error loading exercise templates:', error);
         this.isLoading = false;
+        this.showErrorAlert();
       }
     });
   }
@@ -47,7 +49,10 @@ export class BrowseExercisesPage implements OnInit {
   filterExercises() {
     this.filteredTemplates = this.exerciseTemplates.filter(template => {
       return !this.searchTerm || 
-             template.name.toLowerCase().includes(this.searchTerm.toLowerCase());
+             template.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+             template.targetMuscleGroups?.some(muscle => 
+               muscle.toLowerCase().includes(this.searchTerm.toLowerCase())
+             );
     });
   }
 
@@ -56,18 +61,15 @@ export class BrowseExercisesPage implements OnInit {
     this.filterExercises();
   }
 
-  async viewExerciseDetails(exercise: ExerciseTemplate) {
+  onImageError(event: Event) {
+    ExerciseImagePipe.handleError(event);
+  }
+
+  async showErrorAlert() {
     const alert = await this.alertController.create({
-      header: exercise.name,
-      message: `
-      <div>
-      ${exercise.description || 'No description available'}
-      </div>
-      <div class="ion-padding-top">
-      <strong>Target muscles:</strong> ${exercise.targetMuscleGroups?.join(', ') || 'Not specified'}
-      </div>
-      `,
-      buttons: ['Close']
+      header: 'Error',
+      message: 'Failed to load exercises. Please try again later.',
+      buttons: ['OK']
     });
 
     await alert.present();

@@ -115,12 +115,7 @@
   overflow: hidden;
   margin-right: 12px;
   background: #333;
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+  position: relative;
 }
 
 .exercise-avatar-small {

@@ -71,7 +71,7 @@ export class WorkoutService implements OnDestroy {
   }
 
   public update(id: string, workout: Workout): Observable<Workout> {
-    return this.http.put<Workout>(`${this.apiUrl}/${id}`, workout)
+    return this.http.patch<Workout>(`${this.apiUrl}/${id}`, workout)
       .pipe(this.handleError('update'));
   }
 
@@ -156,7 +156,7 @@ export class WorkoutService implements OnDestroy {
               if (ex.exerciseId && nameMap.has(ex.exerciseId) && !ex.name) {
                 return {
                   ...ex,
-                  name: nameMap.get(ex.exerciseId) || 'Unknown Exercise'
+                  name: nameMap.get(ex.exerciseId)
                 };
               }
               return ex;
@@ -423,7 +423,7 @@ export class WorkoutService implements OnDestroy {
               
               const { sets, ...exerciseWithoutSets } = exercise;
               
-              return this.http.put<Exercise>(
+              return this.http.patch<Exercise>(
                 `${this.apiUrl}/${workout.workoutId}/exercises/${exercise.exerciseId}`, 
                 exerciseWithoutSets
               ).pipe(
@@ -447,7 +447,7 @@ export class WorkoutService implements OnDestroy {
                       
                       if (set.exerciseSetId && !set.exerciseSetId.toString().startsWith('temp-')) {
                         console.log(`Updating existing set ${set.exerciseSetId}`);
-                        return this.http.put<ExerciseSet>(
+                        return this.http.patch<ExerciseSet>(
                           `${this.apiUrl}/${workout.workoutId}/exercises/${exercise.exerciseId}/sets/${set.exerciseSetId}`, 
                           cleanSet
                         ).pipe(
@@ -547,7 +547,7 @@ export class WorkoutService implements OnDestroy {
   }
 
   updateExercise(workoutId: string, exerciseId: string, exerciseDTO: any): Observable<any> {
-    return this.http.put(`${this.apiUrl}/workouts/${workoutId}/exercises/${exerciseId}`, exerciseDTO);
+    return this.http.patch(`${this.apiUrl}/workouts/${workoutId}/exercises/${exerciseId}`, exerciseDTO);
   }
 
   updateExerciseSet(
@@ -556,7 +556,7 @@ export class WorkoutService implements OnDestroy {
     setId: string, 
     setData: any
   ): Observable<any> {
-    return this.http.put<any>(
+    return this.http.patch<any>(
       `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets/${setId}`,
       setData
     ).pipe(

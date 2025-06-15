@@ -9,13 +9,15 @@ export class ExerciseImagePipe implements PipeTransform {
   private readonly imageMapping: Record<string, string> = {
     // Chest exercises
     'Bench Press': 'assets/exercise-icons/bench-press.png',
-    'Incline Bench Press': 'assets/exercise-icons/incline-press.png',
-    'Decline Bench Press': 'assets/exercise-icons/decline-press.png',
-    'Dumbbell Bench Press': 'assets/exercise-icons/dumbbell-press.png',
-    'Incline Dumbbell Press': 'assets/exercise-icons/incline-dumbbell.png',
-    'Dumbbell Flyes': 'assets/exercise-icons/dumbbell-flyes.png',
-    'Cable Flyes': 'assets/exercise-icons/cable-flyes.png',
+    'Incline Bench Press': 'assets/exercise-icons/incline-barbell-bench-press.png',
+    'Decline Barbell Bench Press': 'assets/exercise-icons/decline-barbell-bench-press.png',
+    'Dumbbell Bench Press': 'assets/exercise-icons/dumbell-bench-press.png',
+    'Dumbbell Fly': 'assets/exercise-icons/dumbbell-fly.png',
+    'Incline Dumbbell Bench Press': 'assets/exercise-icons/incline-dumbbell-bench-press.png',
+    'Cable Fly': 'assets/exercise-icons/cable-fly.png',
     'Push-ups': 'assets/exercise-icons/push-up.png',
+    'Decline Dumbbell Bench Press': 'assets/exercise-icons/decline-dumbbell-bench-press.png',
+
     
     // Back exercises
     'Deadlift': 'assets/exercise-icons/deadlift.png',
@@ -44,8 +46,8 @@ export class ExerciseImagePipe implements PipeTransform {
     // Arms exercises
     'Bicep Curls': 'assets/exercise-icons/bicep-curl.png',
     'Hammer Curls': 'assets/exercise-icons/hammer-curl.png',
-    'Tricep Pushdowns': 'assets/exercise-icons/tricep-pushdown.png',
-    'Tricep Extensions': 'assets/exercise-icons/tricep-extension.png',
+    'Triceps Pushdowns': 'assets/exercise-icons/tricep-pushdown.png',
+    'Triceps Extensions': 'assets/exercise-icons/tricep-extension.png',
     'Skull Crushers': 'assets/exercise-icons/skull-crusher.png',
     
     // Abs exercises
@@ -56,7 +58,6 @@ export class ExerciseImagePipe implements PipeTransform {
     'Ab Rollouts': 'assets/exercise-icons/ab-rollout.png',
   };
   
-  // Set fallback to athletiq logo
   private readonly fallbackImage = 'assets/logo/athletiq-logo.jpeg';
   
   constructor(private sanitizer: DomSanitizer) {}
@@ -64,15 +65,13 @@ export class ExerciseImagePipe implements PipeTransform {
   transform(exerciseName: string | undefined | null, useSanitizer = false): string | SafeUrl {
     if (!exerciseName) return this.fallbackImage;
     
-    const imagePath = this.imageMapping[exerciseName] || 
-                     'assets/exercise-icons/barbell.png';
+    const imagePath = this.imageMapping[exerciseName];
     
     return useSanitizer ? 
       this.sanitizer.bypassSecurityTrustUrl(imagePath) : 
       imagePath;
   }
   
-  // Static method to handle errors that can be used in a directive
   static handleError(event: Event): void {
     const imgElement = event.target as HTMLImageElement;
     if (imgElement) {

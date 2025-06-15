@@ -159,7 +159,6 @@ export class ActiveWorkoutService {
     );
   }
 
-  // Pause the workout
   pauseWorkout(): void {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession) return;
@@ -177,7 +176,6 @@ export class ActiveWorkoutService {
     this.saveCurrentSession();
   }
 
-  // Resume the workout
   resumeWorkout(): void {
     const currentSession = this.currentSessionSubject.value;
     if (!currentSession || !currentSession.isPaused) return;
@@ -216,7 +214,6 @@ export class ActiveWorkoutService {
     console.log(`Fetching exercises for workout ${workoutId} from API`);
     return this.http.get<Exercise[]>(`${this.workoutApiUrl}/${workoutId}/exercises`).pipe(
       switchMap(exercises => {
-        // Sort exercises by orderPosition
         const sortedExercises = [...exercises].sort(
           (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
         );
@@ -1033,7 +1030,7 @@ export class ActiveWorkoutService {
     
     console.log('Sending set update to backend:', payload);
     
-    return this.http.put<ExerciseSet>(
+    return this.http.patch<ExerciseSet>(
       `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseWithSet.exerciseId}/sets/${setToUpdate.exerciseSetId}`,
       payload
     ).pipe(

@@ -1,30 +1,53 @@
-<ion-header class="notch-friendly-header">
+<ion-header>
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
+      <ion-back-button defaultHref="/tabs/profile"></ion-back-button>
     </ion-buttons>
+    <ion-title>Settings</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-list>
-    <ion-item-divider>
-      <ion-label>Account</ion-label>
-    </ion-item-divider>
-
-    <ion-item button (click)="resetPassword()">
-      <ion-icon name="key-outline" slot="start"></ion-icon>
-      <ion-label>Reset Password</ion-label>
-    </ion-item>
-
-    <ion-item button (click)="confirmLogout()">
-      <ion-icon name="log-out-outline" slot="start"></ion-icon>
-      <ion-label>Logout</ion-label>
-    </ion-item>
-
-    <ion-item button (click)="confirmDeleteAccount()" color="danger">
-      <ion-icon name="trash-outline" slot="start"></ion-icon>
-      <ion-label>Delete Account</ion-label>
-    </ion-item>
-  </ion-list>
+  <ion-list-header>
+    <ion-label>Your Info</ion-label>
+  </ion-list-header>
+  
+  <ion-item>
+    <ion-icon name="person-outline" slot="start"></ion-icon>
+    <ion-label>Username</ion-label>
+    <ion-note slot="end">{{ username || 'User' }}</ion-note>
+  </ion-item>
+  
+  <ion-item lines="full">
+    <ion-icon name="mail-outline" slot="start"></ion-icon>
+    <ion-label>Email</ion-label>
+    <ion-note slot="end">{{ userEmail }}</ion-note>
+  </ion-item>
+  
+  <ion-list-header>
+    <ion-label>Account Management</ion-label>
+  </ion-list-header>
+  
+  <ion-item lines="full" (click)="logout()">
+    <ion-icon name="log-out-outline" slot="start"></ion-icon>
+    <ion-label>Logout</ion-label>
+  </ion-item>
+  
+  <ion-list-header>
+    <ion-label>App Information</ion-label>
+  </ion-list-header>
+  
+  <ion-item lines="full">
+    <ion-icon name="information-circle-outline" slot="start"></ion-icon>
+    <ion-label>Version</ion-label>
+    <ion-note slot="end">1.0</ion-note>
+  </ion-item>
+  
+  <ion-list-header>
+  </ion-list-header>
+  
+  <ion-item lines="none" color="danger" (click)="confirmDeleteAccount()">
+    <ion-icon name="trash-outline" slot="start"></ion-icon>
+    <ion-label>Delete Account</ion-label>
+  </ion-item>
 </ion-content>
