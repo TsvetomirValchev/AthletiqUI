@@ -4,7 +4,7 @@ import { IonicModule, AlertController, ToastController, LoadingController, Actio
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { finalize, switchMap, take } from 'rxjs/operators';
+import { finalize, switchMap, take, tap, catchError } from 'rxjs/operators';
 import { ActiveWorkoutService } from '../../services/active-workout.service';
 import { WorkoutService } from '../../services/workout.service';
 import { WorkoutHistoryService } from '../../services/workout-history.service';
@@ -19,6 +19,7 @@ import { TimePipe } from '../../pipes/time.pipe';
 import { ExerciseFilterPipe } from '../../pipes/exercise-filter.pipe';
 import { SortPipe } from '../../pipes/sort.pipe';
 import { ExerciseImagePipe } from '../../pipes/exercise-image.pipe';
+import { lastValueFrom, forkJoin, of } from 'rxjs';
 
 @Component({
   selector: 'app-active-workout',
@@ -131,9 +132,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
               this.exercises = [...session.exercises].sort(
                 (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
               );
-              
-              console.log('Loaded exercises with sets:', 
-                this.exercises.map(e => `${e.name} (${e.sets?.length || 0} sets)`));
               
               this.workoutActive = true;
               this.isLoading = false;
@@ -261,6 +259,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     if (setIndex < 0 || setIndex >= exercise.sets.length) return;
     
     const set = exercise.sets[setIndex];
+    const wasCompleted = set.completed;
     set.completed = !set.completed;
     
     const exerciseId = exercise.exerciseId || exercise.tempId;
@@ -273,6 +272,10 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       'completed',
       set.completed
     );
+    
+    if (set.completed && !wasCompleted && exercise.restTimeSeconds && exercise.restTimeSeconds > 0) {
+      console.log(`Starting rest timer for ${exercise.restTimeSeconds} seconds`);
+    }
     
     this.changeDetector.markForCheck();
   }
@@ -445,84 +448,56 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   }
 
   async finishWorkout() {
-    if (!this.workout) return;
-    
-    this.isCompleting = true;
+  if (!this.workout) return;
+  
+  this.isCompleting = true;
 
-    try {
-      const loading = await this.loadingController.create({
-        message: 'Completing workout...'
-      });
-      await loading.present();
-      
-      const currentSession = this.activeWorkoutService.getCurrentSession();
-      if (!currentSession) {
-        this.showToast('No active session found');
-        loading.dismiss();
-        return;
-      }
-      
-      this.stopTimer();
-      
-      const hasTempExercises = currentSession.exercises.some(
-        exercise => !exercise.exerciseId || exercise.exerciseId.toString().startsWith('temp-')
-      );
-      
-      const workoutWithDuration: ActiveWorkout = {
-        ...currentSession.workout,
-        duration: this.elapsedTime,
-        endTime: new Date().toISOString()
-      };
-      
-      if (hasTempExercises) {
-        this.activeWorkoutService.syncWorkoutWithBackend(this.workout.workoutId!)
-          .pipe(
-            switchMap(syncedExercises => {
-              return this.activeWorkoutService.clearSavedSession().then(() => syncedExercises);
-            }),
-            switchMap(syncedExercises => {
-              return this.workoutHistoryService.completeWorkout(workoutWithDuration, syncedExercises);
-            }),
-            finalize(() => {
-              loading.dismiss();
-              this.isCompleting = false;
-            })
-          )
-          .subscribe({
-            next: async () => {
-              this.confirmUpdateTemplate(currentSession.workout, currentSession.exercises);
-            },
-            error: (error: any) => {
-              console.error('Error completing workout:', error);
-              this.showToast('Failed to save workout');
-            }
-          });
-      } else {
-        await this.activeWorkoutService.clearSavedSession();
-        
-        this.workoutHistoryService.completeWorkout(workoutWithDuration, currentSession.exercises)
-          .pipe(
-            finalize(() => {
-              loading.dismiss();
-              this.isCompleting = false;
-            })
-          )
-          .subscribe({
-            next: async () => {
-              this.confirmUpdateTemplate(currentSession.workout, currentSession.exercises);
-            },
-            error: (error) => {
-              console.error('Error completing workout:', error);
-              this.showToast('Failed to save workout');
-            }
-          });
-      }
-    } catch (error) {
-      console.error('Error in finishWorkout:', error);
+  try {
+    const loading = await this.loadingController.create({
+      message: 'Completing workout...'
+    });
+    await loading.present();
+    
+    const currentSession = this.activeWorkoutService.getCurrentSession();
+    if (!currentSession) {
+      this.showToast('No active session found');
+      loading.dismiss();
       this.isCompleting = false;
-      this.showToast('An unexpected error occurred');
+      return;
     }
+    
+    this.stopTimer();
+    
+    const workoutWithDuration: ActiveWorkout = {
+      ...currentSession.workout,
+      duration: this.elapsedTime,
+      endTime: new Date().toISOString()
+    };
+    
+    this.workoutHistoryService.completeWorkout(workoutWithDuration, currentSession.exercises)
+      .pipe(
+        finalize(() => {
+          loading.dismiss();
+          this.isCompleting = false;
+        })
+      )
+      .subscribe({
+        next: async () => {
+          await this.activeWorkoutService.clearSavedSession();
+          this.showToast('Workout completed successfully');
+          this.router.navigate(['/tabs/profile']);
+        },
+        error: (error) => {
+          console.error('Error completing workout:', error);
+          this.showToast('Failed to save workout');
+        }
+      });
+  } catch (error) {
+    console.error('Error in finishWorkout:', error);
+    this.isCompleting = false;
+    this.showToast('An unexpected error occurred');
   }
+}
 
   ngOnDestroy() {
     this.stopTimer();
@@ -603,75 +578,60 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   }
 
   async removeExercise(exercise: Exercise) {
-    if (!exercise || !this.workout?.workoutId) return;
+  if (!exercise || !this.workout?.workoutId) return;
+  
+  try {
+    const exerciseId = exercise.exerciseId || exercise.tempId;
     
-    try {
-      const isTempExercise = !exercise.exerciseId || exercise.exerciseId.toString().startsWith('temp-');
-      const exerciseId = exercise.exerciseId || exercise.tempId;
-      
-      if (!exerciseId) {
-        this.showToast('Cannot remove exercise: Missing exercise information');
-        return;
-      }
-      
-      if (!isTempExercise) {
-        console.log(`Deleting real exercise with ID ${exerciseId} from backend`);
-        
-        const loading = await this.loadingController.create({
-          message: 'Removing exercise...',
-          duration: 2000
-        });
-        await loading.present();
-        
-        this.workoutService.removeExerciseFromWorkout(this.workout.workoutId, exerciseId)
-          .subscribe({
-            next: () => {
-              console.log(`Backend deletion successful for exercise ${exerciseId}`);
-              
-              this.activeWorkoutService.removeExerciseFromWorkout(
-                this.workout!.workoutId!, 
-                exerciseId
-              ).subscribe({
-                next: (updatedExercises: Exercise[]) => {
-                  this.exercises = updatedExercises;
-                  this.showToast(`Removed ${exercise.name}`);
-                  this.changeDetector.markForCheck();
-                },
-                error: (error) => {
-                  console.error('Error updating local session after exercise removal:', error);
-                  this.loadExercises(this.workout!.workoutId!);
-                }
-              });
-            },
-            error: (error) => {
-              console.error(`Error deleting exercise ${exerciseId} from backend:`, error);
-              this.showToast('Failed to remove exercise from server');
-              loading.dismiss();
-            }
-          });
-      } else {
-        console.log(`Removing temporary exercise with ID ${exerciseId} from local session`);
-        
-        this.activeWorkoutService.removeExerciseFromWorkout(
-          this.workout.workoutId, 
-          exerciseId
-        ).subscribe({
-          next: (updatedExercises: Exercise[]) => {
-            this.exercises = updatedExercises;
-            this.showToast(`Removed ${exercise.name}`);
-            this.changeDetector.markForCheck();
-          },
-          error: (error) => {
-            console.error('Error removing exercise from local session:', error);
-            this.showToast('Failed to remove exercise');
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error in removeExercise:', error);
-      this.showToast('An unexpected error occurred');
+    if (!exerciseId) {
+      this.showToast('Cannot remove exercise: Missing exercise information');
+      return;
     }
+    
+    const alert = await this.alertController.create({
+      header: 'Remove Exercise',
+      message: `Are you sure you want to remove ${exercise.name}?`,
+      buttons: [
+        {
+          text: 'Cancel',
+          role: 'cancel'
+        },
+        {
+          text: 'Remove',
+          role: 'destructive',
+          handler: () => {
+            const loading = this.loadingController.create({
+              message: 'Removing exercise...',
+              duration: 1000
+            });
+            loading.then(l => l.present());
+            
+            // Only modify the local session, no backend calls
+            this.activeWorkoutService.removeExerciseFromWorkout(
+              this.workout!.workoutId!, 
+              exerciseId
+            ).subscribe({
+              next: (updatedExercises: Exercise[]) => {
+                this.exercises = updatedExercises;
+                this.showToast(`Removed ${exercise.name}`);
+                this.changeDetector.markForCheck();
+              },
+              error: (error) => {
+                console.error('Error removing exercise from local session:', error);
+                this.showToast('Failed to remove exercise');
+              }
+            });
+          }
+        }
+      ]
+    });
+    
+    await alert.present();
+  } catch (error) {
+    console.error('Error in removeExercise:', error);
+    this.showToast('An unexpected error occurred');
   }
+}
 
   reorderExercises(event: CustomEvent<ItemReorderEventDetail>) {
     const itemMove = this.exercises.splice(event.detail.from, 1)[0];
@@ -749,95 +709,6 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     await alert.present();
   }
 
-  async confirmUpdateTemplate(workout: Workout, exercises: Exercise[]): Promise<void> {
-    const alert = await this.alertController.create({
-      header: 'Update Routine',
-      message: 'Do you want to update your workout routine template with the changes you made during this session?',
-      buttons: [
-        {
-          text: 'No',
-          role: 'cancel',
-          handler: () => {
-            this.router.navigate(['/tabs/profile']);
-          }
-        },
-        {
-          text: 'Yes, Update Routine',
-          handler: async () => {
-            const loading = await this.loadingController.create({
-              message: 'Updating routine...'
-            });
-            await loading.present();
-            
-            try {
-              const exercisesToUpdate = JSON.parse(JSON.stringify(exercises));
-              
-              const validExercises = exercisesToUpdate.filter((exercise: { exerciseId: { toString: () => string; }; }) => 
-                exercise.exerciseId && !exercise.exerciseId.toString().startsWith('temp-')
-              );
-              
-              console.log(`Preparing to update ${validExercises.length} exercises with their sets`);
-              
-              const preparedExercises = validExercises.map((exercise: Exercise, exerciseIndex: number) => {
-                const cleanedExercise = {
-                  ...exercise,
-                  tempId: undefined,
-                  orderPosition: exerciseIndex,
-                  sets: exercise.sets ? exercise.sets.map((set, setIndex) => {
-                    const shouldKeepSetId = set.exerciseSetId && 
-                                           !set.exerciseSetId.toString().startsWith('temp-');
-                    
-                    const { tempId, completed, ...cleanSet } = set;
-                    
-                    return {
-                      ...cleanSet,
-                      exerciseSetId: shouldKeepSetId ? cleanSet.exerciseSetId : undefined,
-                      exerciseId: exercise.exerciseId,
-                      orderPosition: setIndex,
-                      type: set.type || 'NORMAL',
-                      reps: set.reps || 0,
-                      weight: set.weight || 0,
-                      restTimeSeconds: set.restTimeSeconds || 0
-                    };
-                  }) : []
-                };
-                
-                return cleanedExercise;
-              });
-              
-              console.log('Sending prepared exercises to backend:', preparedExercises);
-              
-              this.workoutService.updateWorkoutWithExercises(workout, preparedExercises)
-                .pipe(
-                  finalize(() => {
-                    loading.dismiss();
-                  })
-                )
-                .subscribe({
-                  next: (response) => {
-                    console.log('Routine update response:', response);
-                    this.showToast('Routine updated successfully');
-                    this.router.navigate(['/tabs/profile']);
-                  },
-                  error: (error) => {
-                    console.error('Error updating routine:', error);
-                    this.showToast('Failed to update routine');
-                    this.router.navigate(['/tabs/profile']);
-                  }
-                });
-            } catch (error) {
-              console.error('Error preparing exercises for update:', error);
-              loading.dismiss();
-              this.showToast('Failed to update routine');
-              this.router.navigate(['/tabs/profile']);
-            }
-          }
-        }
-      ]
-    });
-
-    await alert.present();
-  }
 
   async showToast(message: string) {
     const toast = await this.toastController.create({
@@ -875,37 +746,15 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     
     const value = event.detail.value;
     
-    if (!this.workout?.workoutId || !exercise.exerciseId || !set.exerciseSetId) {
-      this.activeWorkoutService.updateSetProperty(
-        set.exerciseSetId || set.tempId!, 
-        property, 
-        value
-      );
-      
-      if (property === 'type') {
-        this.refreshExerciseUI(exercise);
-      }
-      
-      return;
-    }
-
-    this.activeWorkoutService.updateSetPropertyWithSync(
-      this.workout.workoutId,
-      exercise.exerciseId,
-      set.exerciseSetId,
-      property,
+    this.activeWorkoutService.updateSetProperty(
+      set.exerciseSetId || set.tempId!, 
+      property, 
       value
-    ).subscribe({
-      next: () => {
-        if (property === 'type') {
-          this.refreshExerciseUI(exercise);
-        }
-      },
-      error: (error) => {
-        console.error(`Error updating ${property}:`, error);
-        this.showToast(`Failed to update ${property}`);
-      }
-    });
+    );
+    
+    if (property === 'type') {
+      this.refreshExerciseUI(exercise);
+    }
   }
 
   private refreshExerciseUI(exercise: Exercise): void {

@@ -1,3 +1,12 @@
+<ion-header class="notch-friendly-header">
+  <ion-toolbar>
+    <ion-buttons slot="start" *ngIf="!isEditMode">
+      <ion-back-button defaultHref="/tabs/workouts"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ isEditMode ? 'Edit Routine' : 'Create Routine' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
 <ion-content class="create-routine-page">
   <div class="main-container">
     <div class="routine-container" [class.empty-routine]="exercises.length === 0">
@@ -7,7 +16,8 @@
       <form [formGroup]="routineForm">
         <div class="title-section">
           <div class="title-label">Routine Title</div>
-          <input formControlName="name" placeholder="Enter routine name" class="title-input">
+          <input formControlName="name" placeholder="Enter routine name" class="title-input" 
+                 (blur)="updateWorkoutName($event)">
         </div>
 
         <ion-reorder-group (ionItemReorder)="reorderExercises($event)" disabled="false">
@@ -141,13 +151,14 @@
           </button>
         </div>
         <div class="routine-action-buttons" *ngIf="exercises.length > 0">
-          <button class="discard-button" (click)="discardCreation()">
+          <button class="discard-button" (click)="discardCreation()" *ngIf="!isEditMode">
             <ion-icon name="close-outline"></ion-icon>
             Discard
           </button>
-          <button class="save-button" (click)="saveWorkout()" [disabled]="!routineForm.valid || exercises.length === 0">
+          <button class="save-button" (click)="saveWorkout()" [disabled]="!routineForm.valid || exercises.length === 0"
+                  [style.width]="isEditMode ? '100%' : 'auto'">
             <ion-icon name="checkmark-outline"></ion-icon>
-            Save Routine
+            {{ isEditMode ? 'Save Changes' : 'Save Routine' }}
           </button>
         </div>
       </form>
@@ -161,8 +172,8 @@
         <ion-icon name="add"></ion-icon>
         ADD EXERCISE
       </button>
-      <button class="discard-routine-btn" (click)="discardCreation()">
-        <ion-icon name="close-outline"></ion-icon>
+      <button class="discard-routine-btn" (click)="discardCreation()" *ngIf="!isEditMode">
+        <ion-icon name="close"></ion-icon>
         DISCARD
       </button>
     </div>

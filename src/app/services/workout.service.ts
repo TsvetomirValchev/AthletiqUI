@@ -100,18 +100,21 @@ export class WorkoutService implements OnDestroy {
     );
   }
 
-  public addSetToExercise(workoutId: string, exerciseId: string, set: ExerciseSet): Observable<Workout> {
+  public addSetToExercise(workoutId: string, exerciseId: string, set: ExerciseSet): Observable<ExerciseSet> {
     const setPayload = {
       ...set,
       exerciseId
     };
     
-    return this.http.post<Workout>(
+    return this.http.post<ExerciseSet>(
       `${this.apiUrl}/${workoutId}/exercises/${exerciseId}/sets`,
       setPayload
     ).pipe(
       tap(() => this.workoutsCache = null),
-      this.handleError('addSetToExercise')
+      catchError(error => {
+        console.error('Error adding set to exercise:', error);
+        return throwError(() => new Error('Failed to add set to exercise'));
+      })
     );
   }
 

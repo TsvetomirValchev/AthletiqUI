@@ -271,74 +271,43 @@ export class ActiveWorkoutService {
     const session = this.currentSessionSubject.value;
     if (!session) return throwError(() => new Error('No active session'));
     
+    const tempId = `temp-exercise-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
     const exerciseSets = exercise.sets || [];
     
-    const { sets, ...exerciseWithoutSets } = exercise;
+    const newExercise: Exercise = {
+      ...exercise,
+      exerciseId: undefined,
+      tempId: tempId,
+      sets: exerciseSets.length > 0 ? exerciseSets.map((set, index) => ({
+        ...set,
+        tempId: `temp-set-${Date.now()}-${index}`,
+        exerciseId: tempId,
+        orderPosition: index
+      })) : [{
+        type: SetType.NORMAL,
+        tempId: `temp-set-${Date.now()}-0`,
+        exerciseId: tempId,
+        orderPosition: 0,
+        reps: 0,
+        weight: 0,
+        restTimeSeconds: 0,
+        completed: false
+      }]
+    };
     
-    return this.http.post<Exercise>(`${this.workoutApiUrl}/${workoutId}/exercises`, exerciseWithoutSets).pipe(
-      switchMap(createdExercise => {
-        console.log(`Created exercise with ID: ${createdExercise.exerciseId}`);
-        
-        const setsToCreate = exerciseSets.length > 0 ? exerciseSets : [{
-          type: SetType.NORMAL,
-          orderPosition: 0,
-          reps: 0,
-          weight: 0,
-          restTimeSeconds: 0,
-          completed: false
-        }];
-        
-        return from(setsToCreate).pipe(
-          concatMap((set, index) => {
-            const setPayload = {
-              exerciseId: createdExercise.exerciseId,
-              type: set.type || SetType.NORMAL,
-              orderPosition: index,
-              reps: set.reps || 0,
-              weight: set.weight || 0,
-              restTimeSeconds: set.restTimeSeconds || 0
-            };
-            
-            console.log(`Creating set for exercise ${createdExercise.exerciseId}:`, setPayload);
-            
-            return this.http.post<ExerciseSet>(
-              `${this.workoutApiUrl}/${workoutId}/exercises/${createdExercise.exerciseId}/sets`,
-              setPayload
-            ).pipe(
-              catchError(error => {
-                console.error(`Error creating set for exercise ${createdExercise.exerciseId}:`, error);
-                return of({
-                  ...setPayload, 
-                  tempId: `temp-set-${Date.now()}-${index}`
-                });
-              })
-            );
-          }),
-          toArray(),
-          map(createdSets => {
-            const exerciseWithSets = {
-              ...createdExercise,
-              sets: createdSets
-            };
-            
-            const updatedExercises = [...session.exercises, exerciseWithSets];
-            
-            this.currentSessionSubject.next({
-              ...session,
-              exercises: updatedExercises
-            });
-            
-            this.saveCurrentSession();
-            
-            return updatedExercises;
-          })
-        );
-      }),
-      catchError(error => {
-        console.error('Error adding exercise to workout:', error);
-        return throwError(() => new Error('Failed to add exercise'));
-      })
-    );
+    console.log('Added temporary exercise to active workout:', newExercise);
+    
+    const updatedExercises = [...session.exercises, newExercise];
+    
+    this.currentSessionSubject.next({
+      ...session,
+      exercises: updatedExercises
+    });
+    
+    this.saveCurrentSession();
+    
+    return of(updatedExercises);
   }
 
   addSetToExercise(exerciseIdOrTempId: string): Observable<Exercise[]> {
@@ -502,71 +471,6 @@ export class ActiveWorkoutService {
     }
   }
 
-  syncSetWithBackend(workoutId: string, exerciseId: string, set: ExerciseSet): Observable<ExerciseSet> {
-    if (set.exerciseSetId && !set.exerciseSetId.toString().startsWith('temp-')) {
-      return of(set);
-    }
-    
-    console.log(`Preparing to sync set with exerciseId ${exerciseId}`);
-    
-    const setToSync = {
-      ...set,
-      exerciseId
-    };
-    
-    const { tempId, completed, exerciseSetId, ...cleanSet } = setToSync;
-    
-    const setPayload = {
-      type: cleanSet.type || 'NORMAL',
-      reps: cleanSet.reps || 0,
-      weight: cleanSet.weight || 0,
-      restTimeSeconds: cleanSet.restTimeSeconds || 0,
-      orderPosition: cleanSet.orderPosition || 0,
-      exerciseId: exerciseId
-    };
-    
-    console.log(`Syncing set to backend for exercise ${exerciseId}, payload:`, setPayload);
-    
-    return this.http.post<any>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseId}/sets`,
-      setPayload
-    ).pipe(
-      tap(response => console.log('Set sync response:', response)),
-      map(response => {
-        const backendId = response.exerciseSetId || response.id;
-        
-        if (!backendId) {
-          console.error('No set ID returned from backend, response:', response);
-        }
-        
-        return {
-          ...set,
-          exerciseId,
-          exerciseSetId: backendId,
-          tempId: undefined
-        };
-      }),
-      catchError(error => {
-        console.error(`Error syncing set for exercise ${exerciseId}:`, error);
-        console.error('Failed set payload:', setPayload);
-        return of(set);
-      })
-    );
-  }
-
-  prepareSetsForBackend(sets: ExerciseSet[] | undefined): any[] {
-    if (!sets || sets.length === 0) return [];
-    
-    return sets.map((set, index) => {
-      const { tempId, completed, ...cleanSet } = set;
-      
-      return {
-        ...cleanSet,
-        orderPosition: index
-      };
-    });
-  }
-
   getCurrentSession(): WorkoutSession | null {
     return this.currentSessionSubject.value;
   }
@@ -649,23 +553,34 @@ export class ActiveWorkoutService {
     }
   }
 
-  removeExerciseFromWorkout(workoutId: string, exerciseId: string): Observable<Exercise[]> {
+  removeExerciseFromWorkout(workoutId: string, exerciseIdOrTempId: string): Observable<Exercise[]> {
     const currentSession = this.getCurrentSession();
     if (!currentSession) {
       return throwError(() => new Error('No active session'));
     }
-    
-    const updatedExercises = currentSession.exercises.filter(
-      ex => ex.exerciseId !== exerciseId
+
+    const exerciseIndex = currentSession.exercises.findIndex(ex => 
+      ex.exerciseId === exerciseIdOrTempId || ex.tempId === exerciseIdOrTempId
     );
-    
-    this.updateSession({
+
+    if (exerciseIndex === -1) {
+      return throwError(() => new Error(`Exercise not found: ${exerciseIdOrTempId}`));
+    }
+
+    const updatedExercises = [...currentSession.exercises];
+    updatedExercises.splice(exerciseIndex, 1);
+
+    updatedExercises.forEach((ex, idx) => {
+      ex.orderPosition = idx;
+    });
+
+    this.currentSessionSubject.next({
       ...currentSession,
       exercises: updatedExercises
     });
-    
+
     this.saveCurrentSession();
-    
+
     return of(updatedExercises);
   }
 
@@ -675,36 +590,41 @@ export class ActiveWorkoutService {
       return throwError(() => new Error('No active session'));
     }
     
-    const updatedExercises = currentSession.exercises.map(exercise => {
-      if ((exercise.exerciseId === exerciseIdOrTempId || exercise.tempId === exerciseIdOrTempId) && exercise.sets) {
-        if (setIndex < 0 || setIndex >= exercise.sets.length) {
-          return exercise;
-        }
-        
-        const updatedSets = [
-          ...exercise.sets.slice(0, setIndex),
-          ...exercise.sets.slice(setIndex + 1)
-        ];
-        
-        updatedSets.forEach((set, index) => {
-          set.orderPosition = index;
-        });
-        
-        return {
-          ...exercise,
-          sets: updatedSets
-        };
-      }
-      return exercise;
+    const exerciseIndex = currentSession.exercises.findIndex(ex => 
+      ex.exerciseId === exerciseIdOrTempId || ex.tempId === exerciseIdOrTempId
+    );
+
+    if (exerciseIndex === -1) {
+      return throwError(() => new Error(`Exercise not found: ${exerciseIdOrTempId}`));
+    }
+
+    const exercise = currentSession.exercises[exerciseIndex];
+    if (!exercise.sets || setIndex >= exercise.sets.length) {
+      return throwError(() => new Error(`Invalid set index: ${setIndex}`));
+    }
+
+    const updatedSets = [...exercise.sets];
+    updatedSets.splice(setIndex, 1);
+
+    updatedSets.forEach((s, idx) => {
+      s.orderPosition = idx;
     });
-    
-    this.updateSession({
+
+    const updatedExercise = {
+      ...exercise,
+      sets: updatedSets
+    };
+
+    const updatedExercises = [...currentSession.exercises];
+    updatedExercises[exerciseIndex] = updatedExercise;
+
+    this.currentSessionSubject.next({
       ...currentSession,
       exercises: updatedExercises
     });
-    
+
     this.saveCurrentSession();
-    
+
     return of(updatedExercises);
   }
 
@@ -750,212 +670,7 @@ export class ActiveWorkoutService {
     }, 30000);
   }
 
-  syncWorkoutWithBackend(workoutId: string): Observable<Exercise[]> {
-    const session = this.getCurrentSession();
-    if (!session) {
-      return throwError(() => new Error('No active session'));
-    }
-    
-    const tempExercises = session.exercises.filter(e => e.tempId && !e.exerciseId);
-    
-    if (tempExercises.length === 0) {
-      return this.syncSetsForExistingExercises(workoutId, session.exercises);
-    }
-    
-    return from(tempExercises).pipe(
-      concatMap(exercise => this.syncExerciseWithBackend(workoutId, exercise)),
-      toArray(),
-      switchMap(syncedExercises => {
-        const idMap = new Map<string, string>();
-        syncedExercises.forEach(ex => {
-          if (ex.tempId && ex.exerciseId) {
-            idMap.set(ex.tempId, ex.exerciseId);
-          }
-        });
-        
-        const updatedExercises = session.exercises.map(exercise => {
-          const updatedEx = { ...exercise };
-          
-          if (exercise.tempId && idMap.has(exercise.tempId)) {
-            updatedEx.exerciseId = idMap.get(exercise.tempId);
-            updatedEx.tempId = undefined;
-            
-            if (updatedEx.sets) {
-              updatedEx.sets = updatedEx.sets.map(set => {
-                if (set.exerciseId === exercise.tempId) {
-                  return { ...set, exerciseId: updatedEx.exerciseId };
-                }
-                return set;
-              });
-            }
-          }
-          
-          return updatedEx;
-        });
-        
-        this.updateSession({
-          ...session,
-          exercises: updatedExercises
-        });
-        
-        return this.syncSetsForExistingExercises(workoutId, updatedExercises);
-      })
-    );
-  }
 
-  syncSetsForExistingExercises(workoutId: string, exercises: Exercise[]): Observable<Exercise[]> {
-    if (!exercises || exercises.length === 0) {
-      console.log('No exercises to sync sets for');
-      return of(exercises || []); 
-    }
-    
-    let hasSetsWithoutExerciseId = false;
-    exercises.forEach(exercise => {
-      if (!exercise.sets) return;
-    });
-    
-    if (hasSetsWithoutExerciseId) {
-      console.error('Some sets have missing exerciseId! This will cause sync failures.');
-    }
-    
-    const setOperations: Array<{
-      exerciseId: string;
-      exerciseName: string;
-      setIndex: number;
-      operation: Observable<ExerciseSet>;
-    }> = [];
-    
-    exercises.forEach(exercise => {
-      if (!exercise.exerciseId || !exercise.sets) return;
-      
-      if (exercise.exerciseId.toString().startsWith('temp-')) {
-        console.warn(`Skipping sets for exercise with temp ID: ${exercise.exerciseId}`);
-        return;
-      }
-      
-      exercise.sets.forEach((set, index) => {
-        if (!set.exerciseSetId || set.exerciseSetId.toString().startsWith('temp-')) {
-          setOperations.push({
-            exerciseId: exercise.exerciseId!,
-            exerciseName: exercise.name || 'Unknown',
-            setIndex: index,
-            operation: this.syncSetWithBackend(workoutId, exercise.exerciseId!, set)
-          });
-        }
-      });
-    });
-    
-    if (setOperations.length === 0) {
-      console.log('No sets to sync with backend');
-      return of(exercises);
-    }    
-    const setObservables = setOperations.map(op => op.operation);
-    
-    return forkJoin(setObservables).pipe(
-      map((syncedSets, index) => {
-        
-        const updatedExercises = [...exercises];
-        
-        syncedSets.forEach((syncedSet, i) => {
-          const { exerciseId, setIndex } = setOperations[i];
-          
-          const exerciseIndex = updatedExercises.findIndex(ex => 
-            ex.exerciseId === exerciseId
-          );
-          
-          if (exerciseIndex !== -1 && updatedExercises[exerciseIndex].sets && 
-              updatedExercises[exerciseIndex].sets!.length > setIndex) {
-            updatedExercises[exerciseIndex].sets![setIndex] = {
-              ...syncedSet,
-              tempId: undefined
-            };
-            
-            console.log(`Updated set at index ${setIndex} for exercise ${exerciseId} with ID ${syncedSet.exerciseSetId}`);
-          }
-        });
-        
-        return updatedExercises;
-      }),
-      tap(updatedExercises => {
-        const currentSession = this.getCurrentSession();
-        if (currentSession) {
-          this.updateSession({
-            ...currentSession,
-            exercises: updatedExercises
-          });
-        }
-      }),
-      catchError(error => {
-        console.error('Error syncing sets with backend:', error);
-        return of(exercises);
-      })
-    );
-  }
-
-  syncExerciseWithBackend(workoutId: string, exercise: Exercise): Observable<Exercise> {
-    if (exercise.exerciseId && !exercise.exerciseId.toString().startsWith('temp-')) {
-      return of(exercise);
-    }
-    
-    const originalTempId = exercise.tempId;
-    
-    const exercisePayload = {
-      exerciseTemplateId: exercise.exerciseTemplateId,
-      name: exercise.name,
-      notes: exercise.notes || '',
-      workoutId,
-      orderPosition: exercise.orderPosition || 0
-    };
-    
-    console.log(`Syncing exercise to backend: ${exercise.name}`, exercisePayload);
-    
-    return this.http.post<any>(
-      `${this.workoutApiUrl}/${workoutId}/exercises`,
-      exercisePayload
-    ).pipe(
-      tap(response => console.log('Exercise sync response:', response)),
-      map(response => {
-        const realExerciseId = response.exerciseId;
-        
-        if (!realExerciseId) {
-          console.error('No exerciseId returned from backend, response:', response);
-          return exercise;
-        }
-        
-        console.log(`Received real exerciseId: ${realExerciseId} for exercise "${exercise.name}"`);
-        
-        const updatedExercise = {
-          ...exercise,
-          exerciseId: realExerciseId,
-          tempId: undefined
-        };
-        
-
-        if (originalTempId && updatedExercise.sets) {
-          console.log(`Updating ${updatedExercise.sets.length} sets to reference real exerciseId ${realExerciseId}`);
-          
-          updatedExercise.sets = updatedExercise.sets.map(set => {
-            if (set.exerciseId === originalTempId) {
-              console.log(`Updating set reference from tempId ${originalTempId} to real ID ${realExerciseId}`);
-              return {
-                ...set,
-                exerciseId: realExerciseId
-              };
-            }
-            return set;
-          });
-          
-          console.log('Updated sets:', updatedExercise.sets);
-        }
-        
-        return updatedExercise;
-      },
-      catchError(error => {
-        console.error(`Error syncing exercise ${exercise.name}:`, error);
-        return of(exercise);
-      })
-    ));
-  }
 
   private ensureSetExerciseIds(exercises: Exercise[]): Exercise[] {
     return exercises.map(exercise => {
@@ -978,71 +693,5 @@ export class ActiveWorkoutService {
       
       return exercise;
     });
-  }
-
-  updateSetPropertyWithSync(
-    workoutId: string,
-    exerciseId: string,
-    setId: string,
-    property: string,
-    value: any
-  ): Observable<ExerciseSet> {
-    const currentSession = this.currentSessionSubject.value;
-    if (!currentSession) {
-      return throwError(() => new Error('No active session'));
-    }
-    
-    let setToUpdate: ExerciseSet | undefined;
-    let exerciseWithSet: Exercise | undefined;
-    
-    currentSession.exercises.forEach(exercise => {
-      if (exercise.sets) {
-        const foundSet = exercise.sets.find(s => 
-          s.exerciseSetId === setId || s.tempId === setId
-        );
-        if (foundSet) {
-          setToUpdate = foundSet;
-          exerciseWithSet = exercise;
-        }
-      }
-    });
-    
-    if (!setToUpdate || !exerciseWithSet) {
-      return throwError(() => new Error(`Set not found: ${setId}`));
-    }
-    
-    if (!setToUpdate.exerciseSetId || setToUpdate.exerciseSetId.toString().startsWith('temp-')) {
-      this.updateSetProperty(setId, property, value);
-      return of({...setToUpdate, [property]: value});
-    }
-    
-    console.log(`Updating set ${setId}, ${property}=${value}`);
-    
-    const payload = {
-      exerciseSetId: setToUpdate.exerciseSetId,
-      exerciseId: exerciseWithSet.exerciseId,
-      type: setToUpdate.type || 'NORMAL',
-      reps: property === 'reps' ? value : setToUpdate.reps || 0,
-      weight: property === 'weight' ? value : setToUpdate.weight || 0,
-      restTimeSeconds: property === 'restTimeSeconds' ? value : setToUpdate.restTimeSeconds || 0,
-      orderPosition: setToUpdate.orderPosition || 0
-    };
-    
-    console.log('Sending set update to backend:', payload);
-    
-    return this.http.patch<ExerciseSet>(
-      `${this.workoutApiUrl}/${workoutId}/exercises/${exerciseWithSet.exerciseId}/sets/${setToUpdate.exerciseSetId}`,
-      payload
-    ).pipe(
-      tap(response => {
-        console.log('Backend update successful:', response);
-        this.updateSetProperty(setId, property, value);
-      }),
-      catchError(error => {
-        console.error('Error updating set:', error);
-        this.updateSetProperty(setId, property, value);
-        return throwError(() => new Error('Failed to update set on server'));
-      })
-    );
   }
 }
