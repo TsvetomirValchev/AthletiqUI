@@ -93,11 +93,13 @@ export class CreateRoutinePage implements OnInit {
   addExerciseFromTemplate(template: ExerciseTemplate) {
     if (!template || !template.exerciseTemplateId) return;
     
+    const orderPosition = this.exercises.length;
+    
     const newExercise: Exercise = {
       exerciseTemplateId: template.exerciseTemplateId,
       name: template.name,
       notes: '',
-      orderPosition: this.exercises.length,
+      orderPosition: orderPosition,
       sets: [
         {
           type: SetType.NORMAL,
@@ -113,15 +115,8 @@ export class CreateRoutinePage implements OnInit {
     if (this.isEditMode && this.workout.workoutId) {
       this.isLoading = true;
       
-      const exercisePayload = {
-        exerciseTemplateId: template.exerciseTemplateId,
-        name: template.name,
-        orderPosition: this.exercises.length,
-        targetMuscleGroups: template.targetMuscleGroups || []
-      };
-      
-      this.workoutService.addExerciseToWorkout(this.workout.workoutId, exercisePayload.exerciseTemplateId).subscribe({
-        next: (createdExercise: Exercise) => {
+      this.workoutService.addExerciseToWorkout(this.workout.workoutId, template.exerciseTemplateId).subscribe({
+        next: (createdExercise: any) => {
           if (createdExercise && createdExercise.exerciseId) {
             newExercise.exerciseId = createdExercise.exerciseId;
             
@@ -144,30 +139,33 @@ export class CreateRoutinePage implements OnInit {
                   if (newExercise.sets) {
                     newExercise.sets[0] = createdSet;
                   }
-                  this.exercises.push(newExercise);
+                  this.exercises = [...this.exercises, newExercise];
                   this.isLoading = false;
                   this.showToast(`Added ${template.name}`);
                   if (window.innerWidth <= 768) {
                     this.showLibraryOnMobile = false;
                   }
+                  this.changeDetector.detectChanges();
                 },
                 error: (error) => {
                   console.error('Error adding set to new exercise:', error);
-                  this.exercises.push(newExercise);
+                  this.exercises = [...this.exercises, newExercise];
                   this.isLoading = false;
                   this.showToast(`Added ${template.name} but failed to create set`);
                   if (window.innerWidth <= 768) {
                     this.showLibraryOnMobile = false;
                   }
+                  this.changeDetector.detectChanges();
                 }
               });
             } else {
-              this.exercises.push(newExercise);
+              this.exercises = [...this.exercises, newExercise];
               this.isLoading = false;
               this.showToast(`Added ${template.name}`);
               if (window.innerWidth <= 768) {
                 this.showLibraryOnMobile = false;
               }
+              this.changeDetector.detectChanges();
             }
           } else {
             this.isLoading = false;
@@ -181,14 +179,13 @@ export class CreateRoutinePage implements OnInit {
         }
       });
     } else {
-      this.exercises.push(newExercise);
+      this.exercises = [...this.exercises, newExercise];
+      this.showToast(`Added ${template.name}`);
       if (window.innerWidth <= 768) {
         this.showLibraryOnMobile = false;
       }
-      this.showToast(`Added ${template.name}`);
+      this.changeDetector.detectChanges();
     }
-    
-    this.changeDetector.markForCheck();
   }
 
   addSet(exerciseIndex: number) {
@@ -336,15 +333,17 @@ export class CreateRoutinePage implements OnInit {
                 exercise.exerciseId
               ).subscribe({
                 next: () => {
-                  this.exercises.splice(exerciseIndex, 1);
+                  const newExercises = [...this.exercises];
+                  newExercises.splice(exerciseIndex, 1);
                   
-                  this.exercises.forEach((ex, idx) => {
+                  newExercises.forEach((ex, idx) => {
                     ex.orderPosition = idx;
                   });
                   
+                  this.exercises = newExercises;
                   this.isLoading = false;
                   this.showToast(`${exercise.name} removed`);
-                  this.changeDetector.markForCheck();
+                  this.changeDetector.detectChanges();
                 },
                 error: (error) => {
                   console.error('Error removing exercise:', error);
@@ -353,13 +352,15 @@ export class CreateRoutinePage implements OnInit {
                 }
               });
             } else {
-              this.exercises.splice(exerciseIndex, 1);
+              const newExercises = [...this.exercises];
+              newExercises.splice(exerciseIndex, 1);
               
-              this.exercises.forEach((ex, idx) => {
+              newExercises.forEach((ex, idx) => {
                 ex.orderPosition = idx;
               });
               
-              this.changeDetector.markForCheck();
+              this.exercises = newExercises;
+              this.changeDetector.detectChanges();
             }
           }
         }
