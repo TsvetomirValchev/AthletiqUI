@@ -83,7 +83,6 @@
                 </div>
                 <div class="exercise-header-right">
                   <span class="sets-count">{{ exercise.exerciseSetHistories?.length || 0 }} sets</span>
-                  <ion-icon [name]="exerciseVisibilityMap.get(getExerciseKey(exercise)) ? 'chevron-up' : 'chevron-down'" class="toggle-sets-icon"></ion-icon>
                 </div>
               </div>            
               <div class="sets-table" *ngIf="exercise.exerciseSetHistories && exercise.exerciseSetHistories.length > 0">
