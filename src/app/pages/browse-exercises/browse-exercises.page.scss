@@ -1,0 +1,25 @@
+.exercise-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 40%;
+  overflow: hidden;
+  background: #333;
+  margin-right: 12px;
+  position: relative;
+  
+  img {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.muscle-groups {
+  margin-top: 4px;
+  
+  .muscle-label {
+    color: var(--ion-color-medium);
+    font-weight: bold;
+  }
+}

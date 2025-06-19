@@ -25,6 +25,7 @@
         <h2>{{ exercise.name }}</h2>
         <p *ngIf="exercise.description">{{ exercise.description }}</p>
         <p *ngIf="exercise.targetMuscleGroups?.length" class="muscle-groups">
+          <span class="muscle-label">Muscle Groups:</span><br>
           <span *ngFor="let muscle of exercise.targetMuscleGroups; let last = last">
             {{ muscle }}{{ !last ? ', ' : '' }}
           </span>

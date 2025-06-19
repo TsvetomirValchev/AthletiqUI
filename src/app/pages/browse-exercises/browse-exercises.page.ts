@@ -22,7 +22,6 @@ export class BrowseExercisesPage implements OnInit {
 
   constructor(
     private exerciseTemplateService: ExerciseTemplateService,
-    private router: Router,
     private alertController: AlertController
   ) { }
 
