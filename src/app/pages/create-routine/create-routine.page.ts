@@ -414,8 +414,7 @@ export class CreateRoutinePage implements OnInit {
       ).subscribe({
         error: (error) => {
           console.error(`Error updating ${property} for set:`, error);
-          this.showToast(`Failed to update ${property}`);
-        }
+          }
       });
     }
   }
@@ -433,7 +432,6 @@ export class CreateRoutinePage implements OnInit {
         }).subscribe({
           error: (error) => {
             console.error('Error updating workout name:', error);
-            this.showToast('Failed to update workout name');
           }
         });
       }
@@ -681,7 +679,6 @@ export class CreateRoutinePage implements OnInit {
           ).subscribe({
             error: (error) => {
               console.error('Error updating set type:', error);
-              this.showToast('Failed to update set type');
             }
           });
         }

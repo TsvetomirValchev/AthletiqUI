@@ -570,4 +570,9 @@ export class WorkoutService implements OnDestroy {
       })
     );
   }
+
+  public clearCache(): void {
+    console.log('WorkoutService: Clearing workouts cache');
+    this.workoutsCache = null;
+  }
 }

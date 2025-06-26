@@ -87,6 +87,10 @@
 
 /* Common Component Styling */
 
+ion-content{
+  --keyboard-offset: 0 !important;
+}
+
 // Headers and titles
 .section-title {
   font-size: 18px;

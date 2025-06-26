@@ -52,6 +52,7 @@ export class WorkoutPage implements OnInit, OnDestroy {
     console.log('WorkoutPage: Resetting all caches');
     this.exercisesCache.clear();
     this.workoutExercises.clear();
+    this.workoutService.clearCache();
   }
 
   loadWorkouts() {
@@ -160,13 +161,16 @@ export class WorkoutPage implements OnInit, OnDestroy {
           role: 'destructive',
           handler: () => {
             if (workout.workoutId) {
+              this.isLoading = true;
+              this.workouts = this.workouts.filter(w => w.workoutId !== workout.workoutId);
               this.workoutService.deleteWorkout(workout.workoutId).subscribe({
                 next: () => {
-                  this.workouts = this.workouts.filter(w => w.workoutId !== workout.workoutId);
+                  this.resetCaches();
+                  this.loadWorkouts();
                   this.showToast('Workout deleted successfully');
                 },
                 error: (error) => {
-                  this.showToast('Failed to delete workout');
+                  console.error('Error deleting workout:', error);
                 }
               });
             }
@@ -191,6 +195,7 @@ export class WorkoutPage implements OnInit, OnDestroy {
     console.log('WorkoutPage: View entering, justLoaded =', this.justLoaded);
         if (this.workouts.length === 0 || !this.justLoaded) {
       console.log('WorkoutPage: Need to reload workouts on view enter');
+      this.resetCaches();
       this.loadWorkouts();
     } else {
       console.log('WorkoutPage: Skipping reload since workouts were just loaded');
