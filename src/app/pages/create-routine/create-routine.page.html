@@ -53,7 +53,8 @@
                 [(ngModel)]="exercise.restTimeSeconds" 
                 [ngModelOptions]="{standalone: true}" 
                 interface="popover" 
-                [selectedText]="(exercise.restTimeSeconds || 0) | time:'rest'">
+                [selectedText]="(exercise.restTimeSeconds || 0) | time:'rest'"
+                (ionChange)="updateExerciseRestTime(exerciseIndex, $event)">
                 <ion-select-option value="0">Off</ion-select-option>
                 <ion-select-option value="15">15s</ion-select-option>
                 <ion-select-option value="30">30s</ion-select-option>

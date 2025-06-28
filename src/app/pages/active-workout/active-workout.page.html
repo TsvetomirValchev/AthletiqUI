@@ -269,4 +269,26 @@
       </div>
     </div>
   </div>
+
+  <div class="rest-timer-overlay" *ngIf="showRestTimer">
+    <div class="rest-timer-container">
+      <div class="rest-timer-header">
+        <h2>Rest Timer</h2>
+        <div class="rest-timer-exercise" *ngIf="restTimerExercise">
+          {{ restTimerExercise.name }}
+        </div>
+      </div>
+      
+      <div class="rest-timer-countdown">
+        {{ restTimeLeft | time:'rest' }}
+      </div>
+      
+      <div class="rest-timer-controls">
+        <ion-button expand="block" fill="outline" color="medium" (click)="stopRestTimer()">
+          <ion-icon name="close-outline" slot="start"></ion-icon>
+          Skip
+        </ion-button>
+      </div>
+    </div>
+  </div>
 </ion-content>

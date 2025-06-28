@@ -57,6 +57,12 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
   searchTerm: string = '';
   selectedMuscleGroup: string = 'All Muscles';
 
+  showRestTimer = false;
+  restTimeLeft = 0;
+  restTimerExercise: Exercise | null = null;
+  restTimerSubscription: Subscription | null = null;
+  restTimerInterval: any = null;
+
   constructor(
     private activeWorkoutService: ActiveWorkoutService,
     private workoutService: WorkoutService,
@@ -165,7 +171,21 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       next: (exercises: Exercise[]) => {
         this.exercises = [...exercises].sort((a, b) => 
           (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
-        );
+        ).map(exercise => {
+          console.log('Exercise sets:', exercise.name, exercise.sets?.map(s => ({
+            restTime: s.restTimeSeconds,
+            completed: s.completed
+          })));
+          if (exercise.sets && exercise.sets.length > 0) {
+            const firstSetRestTime = exercise.sets[0].restTimeSeconds;
+            console.log(`Setting exercise ${exercise.name} rest time to:`, firstSetRestTime);
+            return {
+              ...exercise,
+              restTimeSeconds: firstSetRestTime || 0
+            };
+          }
+          return exercise;
+        });
         
         this.isLoading = false;
         this.startTimer();
@@ -273,11 +293,46 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
       set.completed
     );
     
+    // Start rest timer if set was just marked as completed and rest timer is enabled
     if (set.completed && !wasCompleted && exercise.restTimeSeconds && exercise.restTimeSeconds > 0) {
-      console.log(`Starting rest timer for ${exercise.restTimeSeconds} seconds`);
+      this.startRestTimer(exercise);
     }
     
     this.changeDetector.markForCheck();
+  }
+
+  // Add new methods for rest timer
+  startRestTimer(exercise: Exercise) {
+    // Cancel any existing timer
+    this.stopRestTimer();
+    
+    // Set up new timer
+    this.restTimerExercise = exercise;
+    this.restTimeLeft = exercise.restTimeSeconds || 0;
+    this.showRestTimer = true;
+    
+    // Update the timer every second
+    this.restTimerInterval = setInterval(() => {
+      this.restTimeLeft--;
+      this.changeDetector.detectChanges();
+      
+      if (this.restTimeLeft <= 0) {
+        this.stopRestTimer();
+      }
+    }, 1000);
+    
+    this.changeDetector.detectChanges();
+  }
+
+  stopRestTimer() {
+    if (this.restTimerInterval) {
+      clearInterval(this.restTimerInterval);
+      this.restTimerInterval = null;
+    }
+    
+    this.showRestTimer = false;
+    this.restTimerExercise = null;
+    this.changeDetector.detectChanges();
   }
 
   onSetTypeChange(exercise: Exercise, setIndex: number): void {
@@ -501,6 +556,7 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopTimer();
+    this.stopRestTimer();
   }
 
   addSet(exercise: Exercise) {
@@ -771,4 +827,5 @@ export class ActiveWorkoutPage implements OnInit, OnDestroy {
     imgElement.src = 'assets/logo/athletiq-logo.jpeg';
   }
 }
+
 }

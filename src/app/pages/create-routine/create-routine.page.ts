@@ -201,7 +201,7 @@ export class CreateRoutinePage implements OnInit {
       orderPosition: exercise.sets.length,
       reps: 0,
       weight: 0,
-      restTimeSeconds: 0,
+      restTimeSeconds: exercise.restTimeSeconds || 0,
       completed: false
     };
     
@@ -473,7 +473,8 @@ export class CreateRoutinePage implements OnInit {
         let sets = [...(exercise.sets || [])];
         sets = sets.map((set, setIndex) => ({
           ...set,
-          orderPosition: setIndex
+          orderPosition: setIndex,
+          restTimeSeconds: set.restTimeSeconds !== undefined ? set.restTimeSeconds : (exercise.restTimeSeconds || 0)
         }));
         
         exerciseCopy.sets = sets;
@@ -527,33 +528,47 @@ export class CreateRoutinePage implements OnInit {
             
             forkJoin(exerciseLoads).subscribe({
               next: (exercisesWithSets) => {
-                this.exercises = exercisesWithSets.sort((a, b) => 
-                  (a.orderPosition || 0) - (b.orderPosition || 0)
-                );
-                this.isLoading = false;
-              },
-              error: (error) => {
-                console.error('Error loading exercise sets:', error);
-                this.showToast('Error loading exercise details');
-                this.isLoading = false;
-              }
-            });
-          },
-          error: (error) => {
-            console.error('Error loading workout exercises:', error);
-            this.showToast('Error loading workout exercises');
-            this.isLoading = false;
-          }
-        });
-      },
-      error: (error) => {
-        console.error('Error loading workout:', error);
-        this.showToast('Error loading workout');
-        this.isLoading = false;
-        this.router.navigate(['/tabs/workouts']);
-      }
-    });
-  }
+                // Apply rest time from first set to each exercise
+                this.exercises = exercisesWithSets
+                  .sort((a, b) => (a.orderPosition || 0) - (b.orderPosition || 0))
+                  .map(exercise => {
+                    // Set exercise-level rest time from first set
+                    if (exercise.sets && exercise.sets.length > 0) {
+                      const firstSetRestTime = exercise.sets[0].restTimeSeconds;
+                      console.log(`Setting ${exercise.name} rest time to ${firstSetRestTime}s from first set`);
+                      return {
+                        ...exercise,
+                        restTimeSeconds: firstSetRestTime
+                      };
+                    }
+                    return exercise;
+                  });
+              
+              this.isLoading = false;
+              this.changeDetector.detectChanges(); // Ensure UI updates
+            },
+            error: (error) => {
+              console.error('Error loading exercise sets:', error);
+              this.showToast('Error loading exercise details');
+              this.isLoading = false;
+            }
+          });
+        },
+        error: (error) => {
+          console.error('Error loading workout exercises:', error);
+          this.showToast('Error loading workout exercises');
+          this.isLoading = false;
+        }
+      });
+    },
+    error: (error) => {
+      console.error('Error loading workout:', error);
+      this.showToast('Error loading workout');
+      this.isLoading = false;
+      this.router.navigate(['/tabs/workouts']);
+    }
+  });
+}
 
   reorderExercises(event: CustomEvent<ItemReorderEventDetail>) {
     const itemMove = this.exercises.splice(event.detail.from, 1)[0];
@@ -692,6 +707,59 @@ export class CreateRoutinePage implements OnInit {
         this.changeDetector.detectChanges();
         break;
       }
+    }
+  }
+
+  updateExerciseRestTime(exerciseIndex: number, event: any) {
+    if (exerciseIndex < 0 || exerciseIndex >= this.exercises.length) return;
+    
+    const exercise = this.exercises[exerciseIndex];
+    if (!exercise.sets || exercise.sets.length === 0) return;
+    
+    const restTimeSeconds = Number(event.detail.value);
+    if (isNaN(restTimeSeconds)) return;
+    
+    exercise.restTimeSeconds = restTimeSeconds;
+    
+    if (this.isEditMode && this.workout.workoutId && exercise.exerciseId) {
+      this.isLoading = true;
+      
+      const updateObservables = exercise.sets.map(set => {
+        if (!set.exerciseSetId) return of(null);
+        
+        const updatedSet = {
+          ...set,
+          restTimeSeconds: restTimeSeconds
+        };
+        
+        return this.workoutService.updateExerciseSet(
+          this.workout.workoutId!,
+          exercise.exerciseId!,
+          set.exerciseSetId,
+          updatedSet
+        );
+      });
+      
+      forkJoin(updateObservables).subscribe({
+        next: () => {
+          exercise.sets = exercise.sets!.map(set => ({
+            ...set,
+            restTimeSeconds: restTimeSeconds
+          }));
+          this.isLoading = false;
+          this.changeDetector.detectChanges();
+        },
+        error: (error) => {
+          console.error('Error updating rest times:', error);
+          this.isLoading = false;
+        }
+      });
+    } else {
+      exercise.sets = exercise.sets.map(set => ({
+        ...set,
+        restTimeSeconds: restTimeSeconds
+      }));
+      this.changeDetector.detectChanges();
     }
   }
 }

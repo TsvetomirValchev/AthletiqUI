@@ -128,9 +128,21 @@ export class ActiveWorkoutService {
                     console.log('Loaded all exercises with their sets:', 
                       exercisesWithSets.map(e => `${e.name} (${e.sets?.length || 0} sets)`));
                     
+                    const exercisesWithRestTimes = exercisesWithSets.map(exercise => {
+                      if (exercise.sets && exercise.sets.length > 0) {
+                        const firstSetRestTime = exercise.sets[0].restTimeSeconds;
+                        console.log(`Setting ${exercise.name} rest time to ${firstSetRestTime}s`);
+                        return {
+                          ...exercise,
+                          restTimeSeconds: firstSetRestTime
+                        };
+                      }
+                      return exercise;
+                    });
+                    
                     const session: WorkoutSession = {
                       workout: fetchedWorkout,
-                      exercises: exercisesWithSets,
+                      exercises: exercisesWithRestTimes,
                       startTime: workout.startTime || new Date().toISOString(),
                       elapsedTimeSeconds: 0,
                       isPaused: false,
@@ -204,8 +216,19 @@ export class ActiveWorkoutService {
     if (session && session.workout.workoutId === workoutId) {
       console.log(`Using cached exercises for workout ${workoutId} with sets:`,
         session.exercises.map(e => `${e.name} (${e.sets?.length || 0} sets)`));
+        const exercisesWithRestTimes = [...session.exercises].map(exercise => {
+        if (exercise.sets && exercise.sets.length > 0) {
+          const firstSetRestTime = exercise.sets[0].restTimeSeconds;
+          console.log(`Exercise ${exercise.name}: Using rest time ${firstSetRestTime}s from first set`);
+          return {
+            ...exercise,
+            restTimeSeconds: firstSetRestTime
+          };
+        }
+        return exercise;
+      });
       
-      const sortedExercises = [...session.exercises].sort(
+      const sortedExercises = exercisesWithRestTimes.sort(
         (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
       );
       return of(sortedExercises);
@@ -249,14 +272,38 @@ export class ActiveWorkoutService {
           );
         });
         
-        return forkJoin(exerciseRequests);
+        return forkJoin(exerciseRequests).pipe(
+          map(exercisesWithSets => {
+            return exercisesWithSets.map(exercise => {
+              if (exercise.sets && exercise.sets.length > 0) {
+                const firstSetRestTime = exercise.sets[0].restTimeSeconds;
+                console.log(`Exercise ${exercise.name}: Setting rest time to ${firstSetRestTime}s from first set`);
+                return {
+                  ...exercise,
+                  restTimeSeconds: firstSetRestTime
+                };
+              }
+              return exercise;
+            });
+          })
+        );
       }),
       catchError(error => {
         console.error(`Error getting exercises for workout ${workoutId}:`, error);
         
         const currentSession = this.currentSessionSubject.value;
         if (currentSession && currentSession.workout.workoutId === workoutId) {
-          const sortedExercises = [...currentSession.exercises].sort(
+          const exercisesWithRestTimes = [...currentSession.exercises].map(exercise => {
+            if (exercise.sets && exercise.sets.length > 0) {
+              return {
+                ...exercise,
+                restTimeSeconds: exercise.sets[0].restTimeSeconds
+              };
+            }
+            return exercise;
+          });
+          
+          const sortedExercises = exercisesWithRestTimes.sort(
             (a, b) => (a.orderPosition ?? 0) - (b.orderPosition ?? 0)
           );
           return of(sortedExercises);
